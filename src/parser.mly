@@ -5,7 +5,7 @@
 /* Loops and conditionals */
 %token LOOP WHILE IF ELIF ELSE
 /* Named literals */
-%token NULL TRUE FALSE
+%token NULL
 /* Words related to functions and classes */
 %token DEF CLASS CONSTRUCT RETURN RETURNS SELF REQUIRED OPTIONAL STATIC
 /* Mathematical operations */
@@ -23,10 +23,19 @@
 %token <float> FLOAT_LITERAL
 %token <char> CHAR_LITERAL
 %token <string> STRING_LITERAL
+%token <bool> BOOLEAN_LITERAL
 %token <string> TYPE
 %token <string> IDENTIFIER
 
-/* TODO define complete grammar below */
+/* Set precedence and associativity rules */
+/* https://docs.python.org/3/reference/expressions.html#operator-precedence */
+%right EQ PLUS_EQ MINUS_EQ TIMES_EQ DIVIDE_EQ
+%left OR
+%left AND
+%left NOT
+%left DOUBLE_EQ NOT_EQ GT LT GTE LTE
+%left PLUS MINUS
+%left TIMES DIVIDE MODULO
 
 %start program /* the entry point */
 %type <Ast.expr> program
@@ -56,10 +65,10 @@ stmts:
 stmt:
   expr NEWLINE {}
 | RETURN expr NEWLINE {}
-| if  {}
+| if_stmt  {}
 | loop {}
 
-if:
+if_stmt:
   IF expr COLON NEWLINE INDENT stmts DEDENT {}
 | IF expr COLON NEWLINE INDENT stmts DEDENT ELSE expr COLON NEWLINE INDENT stmts DEDENT {}
 | IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE expr COLON NEWLINE INDENT stmts DEDENT {}
@@ -78,12 +87,12 @@ type_params:  /* these are the method signature type */
   TYPE IDENTIFIER {}
 | type_params COMMA TYPE IDENTIFIER {}
 
-params:
-  IDENTIFIER {}
-| params COMMA IDENTIFIER {}
+params: /* these are the params used to invoke a function */
+  expr {}
+| params COMMA expr {}
 
 classdecl:
-  CLASS TYPE COLON NEWLINE STATIC NEWLINE assigns NEWLINE REQUIRED NEWLINE vdecls NEWLINE OPTIONAL NEWLINE assigns NEWLINE optional_fdecls {}
+  CLASS TYPE COLON NEWLINE STATIC NEWLINE assigns NEWLINE REQUIRED NEWLINE vdecls NEWLINE OPTIONAL NEWLINE assigns NEWLINE optional_fdecls NEWLINE {}
 
 vdecls:
   vdecl {}
@@ -105,13 +114,23 @@ func_call:
 | IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN {}
 | IDENTIFIER LPAREN RPAREN {}
 
+object_instantiation:
+  TYPE LPAREN params RPAREN {}
+| TYPE LPAREN RPAREN {}
+
+array_access:
+  IDENTIFIER LBRACKET expr RBRACKET {}
+
 expr:
   INT_LITERAL {}
 | FLOAT_LITERAL {}
 | CHAR_LITERAL {}
 | STRING_LITERAL {}
+| BOOLEAN_LITERAL {}
 | IDENTIFIER {}
 | func_call {}
+| object_instantiation {}
+| array_access {}
 | LPAREN expr RPAREN {}
 | expr PLUS expr {}
 | expr MINUS expr {}
@@ -129,4 +148,7 @@ expr:
 | expr LT expr {}
 | expr GTE expr {}
 | expr LTE expr {}
+| NOT expr {}
+| expr OR expr {}
+| expr AND expr {}
 

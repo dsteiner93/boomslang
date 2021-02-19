@@ -19,7 +19,7 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   (* Loops and conditionals *)
   ("loop", LOOP); ("while", WHILE); ("if", IF); ("elif", ELIF); ("else", ELSE);
   (* Named literals *)
-  ("null", NULL); ("true", TRUE); ("false", FALSE);
+  ("null", NULL);
   (* Words related to functions and classes *)
   ("def", DEF); ("class", CLASS); ("construct", CONSTRUCT);
   ("return", RETURN); ("returns", RETURNS); ("self", SELF);
@@ -57,7 +57,9 @@ rule tokenize = parse
 | "<=" { LTE }
 (* Literal definitions *)
 | ['0'-'9']+ as lit { INT_LITERAL(int_of_string lit) }
-| ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) } 
+| ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
+| "true" { BOOLEAN_LITERAL(true) }
+| "false" { BOOLEAN_LITERAL(false) }
 (* TODO strings and chars *)
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* TODO comments, single-line and multi-line *)
@@ -67,6 +69,8 @@ rule tokenize = parse
 | '[' { LBRACKET }
 | ']' { RBRACKET }
 | ':' { COLON }
+| '.' { PERIOD }
+| ',' { COMMA }
 | '\n' { NEWLINE }
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
