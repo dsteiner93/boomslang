@@ -35,7 +35,7 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
 let class_name = ['A'-'Z']['a'-'z' 'A'-'Z']*
 
 rule tokenize = parse
-  [' ' '\t' '\r' '\n'] { tokenize lexbuf }
+  [' ' '\t' '\r'] { tokenize lexbuf }
 (* Mathematical operations *)
 | '+' { PLUS }
 | '-' { MINUS }
@@ -59,14 +59,15 @@ rule tokenize = parse
 | ['0'-'9']+ as lit { INT_LITERAL(int_of_string lit) }
 | ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) } 
 (* TODO strings and chars *)
-(* TODO syntactically meaningful whitespace - must keep track of INDENT*)
+(* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* TODO comments, single-line and multi-line *)
-(* Parens, brackets, and colon *)
+(* Misc. punctuation *)
 | '(' { LPAREN }
 | ')' { RPAREN }
 | '[' { LBRACKET }
 | ']' { RBRACKET }
 | ':' { COLON }
+| '\n' { NEWLINE }
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
 (* If we see a lowercase letter followed by any letters or digits,
