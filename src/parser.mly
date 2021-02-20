@@ -47,7 +47,7 @@ program:
   program_without_eof EOF {}
 
 program_without_eof:
-  program_without_eof stmts {}
+  program_without_eof stmt {}
 | program_without_eof fdecl {}
 | program_without_eof classdecl {}
 | /* nothing */ {}
