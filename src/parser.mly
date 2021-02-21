@@ -127,6 +127,7 @@ array_access:
 
 array_literal:
   LBRACKET params RBRACKET {}
+| LBRACKET RBRACKET {}
 
 expr:
   INT_LITERAL {}

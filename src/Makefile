@@ -8,13 +8,13 @@ all : repl.out
 # "ocamlbuild repl.native" will also build the REPL
 
 repl : parser.cmo scanner.cmo repl.cmo
-	ocamlc -o repl $^
+	ocamlc -w +a -o repl $^
 
 %.cmo : %.ml
-	ocamlc -c $<
+	ocamlc -w +a -c $<
 
 %.cmi : %.mli
-	ocamlc -c $<
+	ocamlc -w +a -c $<
 
 scanner.ml : scanner.mll
 	ocamllex $^

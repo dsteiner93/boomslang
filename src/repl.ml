@@ -1,5 +1,3 @@
-open Ast
-
 (* How to use this primitive REPL to test:
 
    Set export OCAMLRUNPARAM='p' in your shell.
