@@ -18,8 +18,6 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   ("not", NOT); ("or", OR); ("and", AND);
   (* Loops and conditionals *)
   ("loop", LOOP); ("while", WHILE); ("if", IF); ("elif", ELIF); ("else", ELSE);
-  (* Named literals *)
-  ("null", NULL);
   (* Words related to functions and classes *)
   ("def", DEF); ("class", CLASS); ("construct", CONSTRUCT);
   ("return", RETURN); ("returns", RETURNS); ("self", SELF);
@@ -73,6 +71,7 @@ rule tokenize = parse
 | '.' { PERIOD }
 | ',' { COMMA }
 | '\n' { NEWLINE }
+| "NULL" { NULL }
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
 (* Array/List type. Lists can be of primitives or objects *)
