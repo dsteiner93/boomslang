@@ -63,6 +63,9 @@ rule tokenize = parse
 (* TODO strings and chars *)
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* TODO comments, single-line and multi-line *)
+| '#'  { S_CMNT }
+| '/#' { M_CMNT_O }
+| '#/' { M_CMNT_C }
 (* Misc. punctuation *)
 | '(' { LPAREN }
 | ')' { RPAREN }
