@@ -8,7 +8,7 @@
 %token NULL
 /* Words related to functions and classes */
 %token DEF CLASS CONSTRUCT RETURN RETURNS SELF REQUIRED OPTIONAL STATIC
-/* Mathematical operations */
+/* Mathematical operators */
 %token PLUS MINUS TIMES DIVIDE MODULO
 /* Assignment operators */
 %token EQ PLUS_EQ MINUS_EQ TIMES_EQ DIVIDE_EQ
@@ -38,17 +38,20 @@
 %left DOUBLE_EQ NOT_EQ GT LT GTE LTE
 %left PLUS MINUS
 %left TIMES DIVIDE MODULO
+%nonassoc UNARY_MINUS
 
 %start program /* the entry point */
-%type <Ast.expr> program
+%type <Ast.program> program
 
 %%
 
-
 program:
-  program stmts {}
-| program fdecl {}
-| program classdecl {}
+  program_without_eof EOF {}
+
+program_without_eof:
+  program_without_eof stmt {}
+| program_without_eof fdecl {}
+| program_without_eof classdecl {}
 | /* nothing */ {}
 
 optional_fdecls:
@@ -62,7 +65,8 @@ fdecl:
 | DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT {}
 
 stmts:
-  stmts stmt {}
+  stmt {}
+| stmts stmt {}
 
 stmt:
   expr NEWLINE {}
@@ -127,6 +131,10 @@ cmnt:
   _        {}
 | M_CMNT_C {}
 
+array_literal:
+  LBRACKET params RBRACKET {}
+| LBRACKET RBRACKET {}
+
 expr:
   INT_LITERAL {}
 | FLOAT_LITERAL {}
@@ -134,15 +142,18 @@ expr:
 | STRING_LITERAL {}
 | BOOLEAN_LITERAL {}
 | IDENTIFIER {}
+| NULL {}
 | func_call {}
 | object_instantiation {}
 | array_access {}
+| array_literal {}
 | LPAREN expr RPAREN {}
 | expr PLUS expr {}
 | expr MINUS expr {}
 | expr TIMES expr {}
 | expr DIVIDE expr {}
 | expr MODULO expr {}
+| MINUS expr %prec UNARY_MINUS {}
 | assign {}
 | TYPE IDENTIFIER PLUS_EQ expr {}
 | TYPE IDENTIFIER MINUS_EQ expr {}
