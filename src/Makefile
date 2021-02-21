@@ -47,3 +47,6 @@ clean :
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
         repl.out repl __pycache__
+
+test :
+	python3 -m unittest run_tests

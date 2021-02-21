@@ -2,7 +2,6 @@
 
 Usage: python3 -m unittest run_tests
 """
-
 import os
 import subprocess
 import unittest
