@@ -1,20 +1,20 @@
-all : calc.out
+all : repl.out
 
 ##############################
 #
 # Compile the project
 #
 
-# "ocamlbuild calc.native" will also build the calculator
+# "ocamlbuild repl.native" will also build the REPL
 
-calc : parser.cmo scanner.cmo calc.cmo
-	ocamlc -o calc $^
+repl : parser.cmo scanner.cmo repl.cmo
+	ocamlc -w +a -o repl $^
 
 %.cmo : %.ml
-	ocamlc -c $<
+	ocamlc -w +a -c $<
 
 %.cmi : %.mli
-	ocamlc -c $<
+	ocamlc -w +a -c $<
 
 scanner.ml : scanner.mll
 	ocamllex $^
@@ -22,12 +22,12 @@ scanner.ml : scanner.mll
 parser.ml parser.mli : parser.mly
 	ocamlyacc $^
 
-calc.out : calc calc.tb
-	./calc < calc.tb > calc.out
+repl.out : repl repl.tb
+	./repl < repl.tb > repl.out
 
 # Depedencies from ocamldep
-calc.cmo : scanner.cmo parser.cmi ast.cmi
-calc.cmx : scanner.cmx parser.cmx ast.cmi
+repl.cmo : scanner.cmo parser.cmi ast.cmi
+repl.cmx : scanner.cmx parser.cmx ast.cmi
 parser.cmo : ast.cmi parser.cmi
 parser.cmx : ast.cmi parser.cmi
 scanner.cmo : parser.cmi
@@ -37,12 +37,16 @@ scanner.cmx : parser.cmx
 ##############################
 
 TARFILES = README Makefile \
-	scanner.mll ast.mli parser.mly calc.ml calc.tb
+	scanner.mll ast.mli parser.mly repl.ml repl.tb
 
-hw1.tar.gz : $(TARFILES)
-	cd .. && tar zcf hw1/hw1.tar.gz $(TARFILES:%=hw1/%)
+pythonplusplus.tar.gz : $(TARFILES)
+	cd .. && tar zcf project/pythonplusplus.tar.gz $(TARFILES:%=hw1/%)
 
 .PHONY : clean
 clean :
 	rm -rf \
-	*.cmi *.cmo parser.ml parser.mli scanner.ml calc.out calc
+	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
+        repl.out repl __pycache__
+
+test :
+	python3 -m unittest run_tests

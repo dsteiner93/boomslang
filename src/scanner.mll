@@ -33,6 +33,7 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
    to distinguish them from identifiers, which must begin
    with a lowercase letter *)
 let class_name = ['A'-'Z']['a'-'z' 'A'-'Z']*
+let int_literal = ['0'-'9']+
 
 rule tokenize = parse
   [' ' '\t' '\r'] { tokenize lexbuf }
@@ -56,7 +57,7 @@ rule tokenize = parse
 | ">=" { GTE }
 | "<=" { LTE }
 (* Literal definitions *)
-| ['0'-'9']+ as lit { INT_LITERAL(int_of_string lit) }
+| int_literal as lit { INT_LITERAL(int_of_string lit) }
 | ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
 | "true" { BOOLEAN_LITERAL(true) }
 | "false" { BOOLEAN_LITERAL(false) }
@@ -74,6 +75,12 @@ rule tokenize = parse
 | '\n' { NEWLINE }
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
+(* Array/List type. Lists can be of primitives or objects *)
+| class_name"["int_literal"]" | "short["int_literal"]" |
+  "int["int_literal"]" | "long["int_literal"]" |
+  "double["int_literal"]" | "float["int_literal"]" |
+  "boolean["int_literal"]" | "char["int_literal"]" |
+  "string["int_literal"]" as t { TYPE(t) }
 (* If we see a lowercase letter followed by any letters or digits,
    it could either be the name of a primitive type (e.g. int), or
    a reserved word (e.g. class) or an identifier for a variable. *)

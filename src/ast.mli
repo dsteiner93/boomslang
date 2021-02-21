@@ -1,6 +1,2 @@
-type operator = Add | Sub | Mul | Div
+type program = unit
 
-type expr =
-    Binop of expr * operator * expr
-  | Lit of int
-  | ()
