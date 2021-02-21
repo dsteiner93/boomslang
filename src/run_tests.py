@@ -92,6 +92,10 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"int x = NULL\n"
     self.assertProgramPasses(program)
 
+  def test_double_eq(self):
+    program = b"3 == x\n"
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -128,6 +132,9 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"NULL = int x\n"
     self.assertProgramFails(program)
 
+  def test_invalid_double_eq(self):
+    program = b"x ==\n"
+    self.assertProgramFails(program)
 
 if __name__ == '__main__':
     unittest.main()  
