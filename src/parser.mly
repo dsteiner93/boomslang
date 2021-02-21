@@ -26,8 +26,6 @@
 %token <bool> BOOLEAN_LITERAL
 %token <string> TYPE
 %token <string> IDENTIFIER
-/* Comments */
-%token S_CMNT M_CMNT_O M_CMNT_C
 
 /* Set precedence and associativity rules */
 /* https://docs.python.org/3/reference/expressions.html#operator-precedence */
@@ -127,10 +125,6 @@ object_instantiation:
 array_access:
   IDENTIFIER LBRACKET expr RBRACKET {}
 
-cmnt:
-  _        {}
-| M_CMNT_C {}
-
 array_literal:
   LBRACKET params RBRACKET {}
 | LBRACKET RBRACKET {}
@@ -168,6 +162,4 @@ expr:
 | NOT expr {}
 | expr OR expr {}
 | expr AND expr {}
-| S_CMNT {}
-| M_CMNT_O cmnt{}
 

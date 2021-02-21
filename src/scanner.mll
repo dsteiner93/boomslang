@@ -62,9 +62,8 @@ rule tokenize = parse
 (* TODO strings and chars *)
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* TODO comments, single-line and multi-line *)
-| '#'  { S_CMNT }
-| '/#' { M_CMNT_O }
-| '#/' { M_CMNT_C }
+| '#'  { single_comment lexbuf }
+| "/#" { multi_comment lexbuf }
 (* Misc. punctuation *)
 | '(' { LPAREN }
 | ')' { RPAREN }
@@ -96,3 +95,10 @@ rule tokenize = parse
   }
 | eof { EOF }
 
+and multi_comment = parse
+  "#/" { tokenize lexbuf }
+| _ { multi_comment lexbuf }
+
+and single_comment = parse
+  '\n' { tokenize lexbuf }
+| _ { single_comment lexbuf }

@@ -92,6 +92,14 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"int x = NULL\n"
     self.assertProgramPasses(program)
 
+  def test_single_comments(self):
+    program = b"#comments\n"
+    self.assertProgramPasses(program)
+
+  def test_multi_comments(self):
+    program = b"/#comments\ncomments#/\n"
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -126,6 +134,14 @@ class TestLexerAndParser(unittest.TestCase):
 
   def test_invalid_null_assignment(self):
     program = b"NULL = int x\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_single_comment(self):
+    program = b"/ comment\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_multi_comment(self):
+    program = b"comment #/\n"
     self.assertProgramFails(program)
 
 
