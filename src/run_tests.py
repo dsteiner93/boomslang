@@ -98,6 +98,9 @@ class TestLexerAndParser(unittest.TestCase):
 
   def test_multi_comments(self):
     program = b"/#comments\ncomments#/\n"
+    
+  def test_double_eq(self):
+    program = b"3 == x\n"
     self.assertProgramPasses(program)
 
   def test_nonsense_fails(self):
@@ -144,6 +147,9 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"comment #/\n"
     self.assertProgramFails(program)
 
+  def test_invalid_double_eq(self):
+    program = b"x ==\n"
+    self.assertProgramFails(program)
 
 if __name__ == '__main__':
     unittest.main()  

@@ -153,7 +153,7 @@ expr:
 | TYPE IDENTIFIER MINUS_EQ expr {}
 | TYPE IDENTIFIER TIMES_EQ expr {}
 | TYPE IDENTIFIER DIVIDE_EQ expr {}
-| TYPE IDENTIFIER DOUBLE_EQ expr {}
+| expr DOUBLE_EQ expr {}
 | expr NOT_EQ expr {}
 | expr GT expr {}
 | expr LT expr {}
