@@ -11,10 +11,26 @@ _PASSED = b"Passed\n"
 class TestLexerAndParser(unittest.TestCase):
 
   def setUp(self):
-    os.system("make clean")
+    self.makeClean()
 
   def tearDown(self):
-    os.system("make clean")
+    self.makeClean()
+
+  def makeClean(self):
+    process = subprocess.Popen(["make", "clean"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    _, _ = process.communicate()
+    process.terminate()
+
+  def make(self):
+    process = subprocess.Popen(["make"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    _, _ = process.communicate()
+    process.terminate()
 
   def assertPassed(self, stdout, stderr):
     self.assertIn(_PASSED, stdout)
@@ -25,7 +41,7 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertIn(b"Stdlib.Parsing.Parse_error", stderr)
 
   def assertProgram(self, program, passes=True):
-    os.system("make")
+    self.make()
     process = subprocess.Popen(["./repl"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -51,6 +67,10 @@ class TestLexerAndParser(unittest.TestCase):
     process.terminate()
     self.assertNotIn(b"shift/reduce conflicts", stdout)
     self.assertNotIn(b"shift/reduce conflicts", stderr)
+
+  def test_empty_program_passes(self):
+    program = b""
+    self.assertProgramPasses(program)
 
   def test_simple_assignment_passes_1(self):
     program = b"int x = 5 \n"
@@ -103,6 +123,26 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"3 == x\n"
     self.assertProgramPasses(program)
 
+  def test_newlines_1(self):
+    program = b"\n"
+    self.assertProgramPasses(program)
+
+  def test_newlines_2(self):
+    program = b"\n\n\n\n\n"
+    self.assertProgramPasses(program)
+
+  def test_newlines_3(self):
+    program = b"\n\n\n\n int x = 5 \n\n int y = 6 \n\n"
+    self.assertProgramPasses(program)
+
+  def test_newlines_4(self):
+    program = b"\n\n\n\n int x = 5\n"
+    self.assertProgramPasses(program)
+
+  def test_newlines_5(self):
+    program = b"int x = 5 \n\n\n\n"
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -150,6 +190,11 @@ class TestLexerAndParser(unittest.TestCase):
   def test_invalid_double_eq(self):
     program = b"x ==\n"
     self.assertProgramFails(program)
+
+  def test_invalid_newlines(self):
+    program = b"\n = x\n"
+    self.assertProgramFails(program)
+
 
 if __name__ == '__main__':
     unittest.main()  

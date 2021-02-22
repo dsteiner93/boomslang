@@ -1,4 +1,4 @@
-%{ open Ast %}
+%{ %}
 
 /* Boolean operators */
 %token NOT OR AND
@@ -50,6 +50,7 @@ program_without_eof:
   program_without_eof stmt {}
 | program_without_eof fdecl {}
 | program_without_eof classdecl {}
+| program_without_eof NEWLINE {}
 | /* nothing */ {}
 
 optional_fdecls:

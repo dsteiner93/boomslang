@@ -72,7 +72,7 @@ rule tokenize = parse
 | ':' { COLON }
 | '.' { PERIOD }
 | ',' { COMMA }
-| '\n' { NEWLINE }
+| ['\n']+ { NEWLINE }
 | "NULL" { NULL }
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
