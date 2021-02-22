@@ -61,7 +61,6 @@ rule tokenize = parse
 | "false" { BOOLEAN_LITERAL(false) }
 (* TODO strings and chars *)
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
-(* TODO comments, single-line and multi-line *)
 | '#'  { single_comment lexbuf }
 | "/#" { multi_comment lexbuf }
 (* Misc. punctuation *)
@@ -85,7 +84,7 @@ rule tokenize = parse
 (* If we see a lowercase letter followed by any letters or digits,
    it could either be the name of a primitive type (e.g. int), or
    a reserved word (e.g. class) or an identifier for a variable. *)
-| ['a'-'z']['a'-'z' 'A'-'Z' '0'-'9']* as possible_id {
+| ['a'-'z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as possible_id {
     if List.mem possible_id primitive_types
       then TYPE(possible_id)
     else if StringMap.mem possible_id reserved_word_to_token

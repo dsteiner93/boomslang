@@ -34,7 +34,7 @@ class TestLexerAndParser(unittest.TestCase):
 
   def assertPassed(self, stdout, stderr):
     self.assertIn(_PASSED, stdout)
-    self.assertEqual(b"", stderr)
+    self.assertNotIn(b"Stdlib.Parsing.Parse_error", stderr)
 
   def assertFailed(self, stdout, stderr):
     self.assertEqual(b"", stdout)
@@ -143,6 +143,38 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"int x = 5 \n\n\n\n"
     self.assertProgramPasses(program)
 
+  def test_self_access_with_field(self):
+    program = b"self.x\n"
+    self.assertProgramPasses(program)
+
+  def test_self_assignment_with_field(self):
+    program = b"self.x = 5\n"
+    self.assertProgramPasses(program)
+
+  def test_self_with_expression(self):
+    program = b"int x = self.foo * 5\n"
+    self.assertProgramPasses(program)
+
+  def test_self_access_with_function(self):
+    program = b"self.myfunction(2 % 3) \n"
+    self.assertProgramPasses(program)
+
+  def test_object_variable_access(self):
+    program = b"myobject.x \n"
+    self.assertProgramPasses(program)
+
+  def test_object_variable_assignment(self):
+    program = b"myobject.fOOo12345 = true\n"
+    self.assertProgramPasses(program)
+
+  def test_object_variable_with_expression(self):
+    program = b"boolean x = true and myobject.is_this_true\n"
+    self.assertProgramPasses(program)
+
+  def test_object_function_call(self):
+    program = b"myobject.myfunction(a, b, c)\n\n"
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -193,6 +225,14 @@ class TestLexerAndParser(unittest.TestCase):
 
   def test_invalid_newlines(self):
     program = b"\n = x\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_self_usage(self):
+    program = b"self.\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_object_usage(self):
+    program = b"myobject.\n"
     self.assertProgramFails(program)
 
 

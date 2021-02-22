@@ -112,16 +112,23 @@ assigns:
 
 assign:
   TYPE IDENTIFIER EQ expr {}
+| object_variable_access EQ expr {}
 
 func_call:
   IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN {}
+| SELF PERIOD IDENTIFIER LPAREN params RPAREN {}
 | IDENTIFIER LPAREN params RPAREN {}
 | IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN {}
+| SELF PERIOD IDENTIFIER LPAREN RPAREN {}
 | IDENTIFIER LPAREN RPAREN {}
 
 object_instantiation:
   TYPE LPAREN params RPAREN {}
 | TYPE LPAREN RPAREN {}
+
+object_variable_access:
+  IDENTIFIER PERIOD IDENTIFIER {}
+| SELF PERIOD IDENTIFIER {}
 
 array_access:
   IDENTIFIER LBRACKET expr RBRACKET {}
@@ -140,6 +147,7 @@ expr:
 | NULL {}
 | func_call {}
 | object_instantiation {}
+| object_variable_access {}
 | array_access {}
 | array_literal {}
 | LPAREN expr RPAREN {}
