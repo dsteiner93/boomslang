@@ -84,6 +84,10 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"string foo = myfunction(1+1+2+3+5)\n"
     self.assertProgramPasses(program)
 
+  def test_assignment_without_type_passes(self):
+    program = b"x = 5\n"
+    self.assertProgramPasses(program)
+
   def test_object_assignment_passes(self):
     program = b"MyObject foo = MyObject(2, myfunc(2+2)) \n"
     self.assertProgramPasses(program)
@@ -200,10 +204,6 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramFails(program)
 
   def test_invalid_assignment_fails_1(self):
-    program = b"x = 5 \n"
-    self.assertProgramFails(program)
-
-  def test_invalid_assignment_fails_2(self):
     program = b"int x = \n"
     self.assertProgramFails(program)
 

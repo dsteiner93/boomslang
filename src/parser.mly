@@ -116,6 +116,7 @@ assigns:
 
 assign:
   TYPE IDENTIFIER EQ expr {}
+| IDENTIFIER EQ expr {}
 | object_variable_access EQ expr {}
 
 assign_update:
