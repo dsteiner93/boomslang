@@ -7,7 +7,7 @@
 /* Named literals */
 %token NULL
 /* Words related to functions and classes */
-%token DEF CLASS CONSTRUCT RETURN RETURNS SELF REQUIRED OPTIONAL STATIC
+%token DEF CLASS SELF RETURN RETURNS STATIC REQUIRED OPTIONAL
 /* Mathematical operators */
 %token PLUS MINUS TIMES DIVIDE MODULO
 /* Assignment operators */
@@ -20,6 +20,7 @@
 %token NEWLINE INDENT DEDENT EOF
 /* Parameterized tokens */
 %token <int> INT_LITERAL
+%token <int64> LONG_LITERAL
 %token <float> FLOAT_LITERAL
 %token <char> CHAR_LITERAL
 %token <string> STRING_LITERAL
@@ -79,7 +80,6 @@ if_stmt:
 | IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE expr COLON NEWLINE INDENT stmts DEDENT {}
 | IF expr COLON NEWLINE INDENT stmts DEDENT elif {}
 
-/* TODO(nikhil) maybe rework this with else later */
 elif:
   ELIF expr COLON NEWLINE INDENT stmts DEDENT {}
 | ELIF INDENT stmts DEDENT elif {}
@@ -139,6 +139,7 @@ array_literal:
 
 expr:
   INT_LITERAL {}
+| LONG_LITERAL {}
 | FLOAT_LITERAL {}
 | CHAR_LITERAL {}
 | STRING_LITERAL {}

@@ -9,8 +9,7 @@ module StringMap = Map.Make(String)
 let add_entry map pair = StringMap.add (fst pair) (snd pair) map
 
 let primitive_types = [
-  "short"; "int"; "long"; "float"; "double"; "boolean"; "char"; "string";
-  "void";
+  "int"; "long"; "float"; "boolean"; "char"; "string"; "void";
 ]
 
 let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
@@ -19,9 +18,9 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   (* Loops and conditionals *)
   ("loop", LOOP); ("while", WHILE); ("if", IF); ("elif", ELIF); ("else", ELSE);
   (* Words related to functions and classes *)
-  ("def", DEF); ("class", CLASS); ("construct", CONSTRUCT);
-  ("return", RETURN); ("returns", RETURNS); ("self", SELF);
-  ("required", REQUIRED); ("optional", OPTIONAL); ("static", STATIC);
+  ("def", DEF); ("class", CLASS); ("self", SELF);
+  ("return", RETURN); ("returns", RETURNS);
+  ("static", STATIC); ("required", REQUIRED); ("optional", OPTIONAL);
 ]
 
 }
@@ -54,13 +53,7 @@ rule tokenize = parse
 | "<" { LT }
 | ">=" { GTE }
 | "<=" { LTE }
-(* Literal definitions *)
-| int_literal as lit { INT_LITERAL(int_of_string lit) }
-| ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
-| "true" { BOOLEAN_LITERAL(true) }
-| "false" { BOOLEAN_LITERAL(false) }
-(* TODO strings and chars *)
-(* TODO syntactically meaningful whitespace - must keep track of INDENT *)
+(* Comments *)
 | '#'  { single_comment lexbuf }
 | "/#" { multi_comment lexbuf }
 (* Misc. punctuation *)
@@ -73,12 +66,21 @@ rule tokenize = parse
 | ',' { COMMA }
 | ['\n']+ { NEWLINE }
 | "NULL" { NULL }
+(* Literal definitions *)
+| int_literal as lit { INT_LITERAL(int_of_string lit) }
+| int_literal"L" as lit {
+    LONG_LITERAL(Int64.of_string (String.sub lit 0 (String.length lit - 1)))
+}
+| ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
+| "true" { BOOLEAN_LITERAL(true) }
+| "false" { BOOLEAN_LITERAL(false) }
+(* TODO strings and chars *)
+(* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }
 (* Array/List type. Lists can be of primitives or objects *)
-| class_name"["int_literal"]" | "short["int_literal"]" |
-  "int["int_literal"]" | "long["int_literal"]" |
-  "double["int_literal"]" | "float["int_literal"]" |
+| class_name"["int_literal"]" | "int["int_literal"]" |
+  "long["int_literal"]" | "float["int_literal"]" |
   "boolean["int_literal"]" | "char["int_literal"]" |
   "string["int_literal"]" as t { TYPE(t) }
 (* If we see a lowercase letter followed by any letters or digits,
