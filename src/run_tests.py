@@ -183,6 +183,14 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"long lo = 500000000000L\n"
     self.assertProgramPasses(program)
 
+  def test_valid_minus_eq(self):
+    program = b"fOo -= 500L\n"
+    self.assertProgramPasses(program)
+
+  def test_valid_divide_eq_with_object(self):
+    program = b"myobject.heY /= 20\n"
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -252,7 +260,15 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramFails(program)
 
   def test_invalid_floating_point_fails(self):
-    program = b"float v = .5\b"
+    program = b"float v = .5\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_plus_eq(self):
+    program = b"int x += 5\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_times_eq(self):
+    program = b"int x *= 6\n"
     self.assertProgramFails(program)
 
 

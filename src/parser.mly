@@ -97,7 +97,11 @@ params: /* these are the params used to invoke a function */
 | params COMMA expr {}
 
 classdecl:
-  CLASS TYPE COLON NEWLINE STATIC NEWLINE assigns NEWLINE REQUIRED NEWLINE vdecls NEWLINE OPTIONAL NEWLINE assigns NEWLINE optional_fdecls NEWLINE {}
+  CLASS TYPE COLON NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT optional_fdecls NEWLINE {}
 
 vdecls:
   vdecl {}
@@ -113,6 +117,16 @@ assigns:
 assign:
   TYPE IDENTIFIER EQ expr {}
 | object_variable_access EQ expr {}
+
+assign_update:
+  IDENTIFIER PLUS_EQ expr {}
+| IDENTIFIER MINUS_EQ expr {}
+| IDENTIFIER TIMES_EQ expr {}
+| IDENTIFIER DIVIDE_EQ expr {}
+| object_variable_access PLUS_EQ expr {}
+| object_variable_access MINUS_EQ expr {}
+| object_variable_access TIMES_EQ expr {}
+| object_variable_access DIVIDE_EQ expr {}
 
 func_call:
   IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN {}
@@ -159,10 +173,7 @@ expr:
 | expr MODULO expr {}
 | MINUS expr %prec UNARY_MINUS {}
 | assign {}
-| TYPE IDENTIFIER PLUS_EQ expr {}
-| TYPE IDENTIFIER MINUS_EQ expr {}
-| TYPE IDENTIFIER TIMES_EQ expr {}
-| TYPE IDENTIFIER DIVIDE_EQ expr {}
+| assign_update {}
 | expr DOUBLE_EQ expr {}
 | expr NOT_EQ expr {}
 | expr GT expr {}
