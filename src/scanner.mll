@@ -23,6 +23,9 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   ("static", STATIC); ("required", REQUIRED); ("optional", OPTIONAL);
 ]
 
+let strip_firstlast str =
+  if String.length str <= 2 then ""
+  else String.sub str 1 ((String.length str) - 2)
 }
 
 
@@ -74,7 +77,13 @@ rule tokenize = parse
 | ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
 | "true" { BOOLEAN_LITERAL(true) }
 | "false" { BOOLEAN_LITERAL(false) }
-(* TODO strings and chars *)
+(* Char literals are single quotes followed by any single character
+   followed by a single quote *)
+| '\'' _ '\'' as lit { CHAR_LITERAL( (strip_firstlast lit).[0] ) }
+(* String literals in Python++ cannot contain double quotes or newlines.
+   String literals are a " followed by any non newline or double quote
+   followed by " *)
+| '"' ([^'"''\n'])* '"' as lit { STRING_LITERAL(strip_firstlast lit) }
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* User defined types, i.e. class names *)
 | class_name as t { TYPE(t) }

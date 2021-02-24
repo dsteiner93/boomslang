@@ -38,7 +38,8 @@ class TestLexerAndParser(unittest.TestCase):
 
   def assertFailed(self, stdout, stderr):
     self.assertEqual(b"", stdout)
-    self.assertIn(b"Stdlib.Parsing.Parse_error", stderr)
+    self.assertTrue(b"lexing: empty token" in stderr or
+                    b"Stdlib.Parsing.Parse_error" in stderr)
 
   def assertProgram(self, program, passes=True):
     self.make()
@@ -195,6 +196,18 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"myobject.heY /= 20\n"
     self.assertProgramPasses(program)
 
+  def test_valid_char_literal_1(self):
+    program = b"char c = 'a'\n"
+    self.assertProgramPasses(program)
+
+  def test_valid_char_literal_2(self):
+    program = b"char c = '''\n"
+    self.assertProgramPasses(program)
+
+  def test_valid_string_literal(self):
+    program = b'string foo = "foooooOOOoo !@$%^&*()_-+={}|[]:;/<,.>"\n'
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -269,6 +282,14 @@ class TestLexerAndParser(unittest.TestCase):
 
   def test_invalid_times_eq(self):
     program = b"int x *= 6\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_char_literal_fails(self):
+    program = b"char c = ''\n"
+    self.assertProgramFails(program)
+
+  def test_invalid_string_literal_fails(self):
+    program = b'string x = "fOOOO \n foo"\n'
     self.assertProgramFails(program)
 
 
