@@ -94,7 +94,9 @@ rule tokenize = parse
     else
       IDENTIFIER(possible_id)
   }
+| ['_']['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<' '=' 'a'-'z' 'A'-'Z' '0'-'9']+ as lit { OBJ_OPERATOR(lit) }
 | eof { EOF }
+
 
 and multi_comment = parse
   "#/" { tokenize lexbuf }

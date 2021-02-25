@@ -27,6 +27,7 @@
 %token <bool> BOOLEAN_LITERAL
 %token <string> TYPE
 %token <string> IDENTIFIER
+%token <string> OBJ_OPERATOR
 
 /* Set precedence and associativity rules */
 /* https://docs.python.org/3/reference/expressions.html#operator-precedence */
@@ -63,6 +64,7 @@ fdecl:
 | DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT {}
 | DEF IDENTIFIER LPAREN RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
 | DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT {}
+| DEF OBJ_OPERATOR LPAREN TYPE IDENTIFIER RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
 
 stmts:
   stmt {}
@@ -136,6 +138,7 @@ func_call:
 | IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN {}
 | SELF PERIOD IDENTIFIER LPAREN RPAREN {}
 | IDENTIFIER LPAREN RPAREN {}
+| IDENTIFIER OBJ_OPERATOR IDENTIFIER {}
 
 object_instantiation:
   TYPE LPAREN params RPAREN {}
