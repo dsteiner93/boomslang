@@ -64,6 +64,7 @@ rule tokenize = parse
 | ':' { COLON }
 | '.' { PERIOD }
 | ',' { COMMA }
+| '_' { UNDERSCORE }
 | ['\n']+ { NEWLINE }
 | "NULL" { NULL }
 (* Literal definitions *)
@@ -94,7 +95,7 @@ rule tokenize = parse
     else
       IDENTIFIER(possible_id)
   }
-| ['_']['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<' '=' 'a'-'z' 'A'-'Z' '0'-'9']+ as lit { OBJ_OPERATOR(lit) }
+| ['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<']+ as lit { OBJ_OPERATOR(lit) }
 | eof { EOF }
 
 
