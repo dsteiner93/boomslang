@@ -1,0 +1,638 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{minted}
+\usepackage{soul}
+\usepackage[table]{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{amsmath}
+
+\setlist{nolistsep}
+\definecolor{green}{HTML}{66FF66}
+\definecolor{myGreen}{HTML}{009900}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    breaklinks=true,
+}
+
+\renewcommand{\arraystretch}{1.5}
+
+\title{Python++ Language Reference Manual}
+\author{
+Nathan Cuevas\\
+\texttt{njc2150} 
+\and
+Robert Kim\\
+\texttt{rk3145} \and
+Nikhil Min Kovelamudi \\
+\texttt{nmk2146} \and
+David Steiner \\
+\texttt{ds3816}
+}
+\date{February 2021}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Introduction}
+Python++ is a general-purpose imperative programming language inspired by Python that aims to create a language as easy to use as Python, but with the added type safety of Java. The language is strongly and statically typed, has no type inferencing, and supports object-oriented programming without requiring that all functions be part of objects.
+
+Python++ uses syntactically significant whitespace as opposed to curly braces and semicolons. In addition to adding static typing to a Python-style syntax, Python++ aims to add quality of life features such as automatic constructor generation for data classes, a new syntax for loops, and a better operator overloading syntax. Python++ does not offer any garbage collection nor does it allow for pointer arithmetic.
+
+\section{Lexical Conventions}
+Python++ has the following kinds of tokens: keywords, type names, identifiers, operators, literals, comments, punctuation, and syntactically significant whitespace. Python++ uses the ASCII character set and is case-sensitive.
+
+\subsection{Keywords}
+Python++ treats the following keywords as reserved and will always return a special token matching the name rather than treating it as any other type of token. The reserved keywords are:
+\texttt{not or and loop while if elif else def class return returns self required optional static NULL}
+
+\subsection{Type names}
+Python++ is a statically typed language. A type is either a primitive type, which means it matches one of the below types, a class name, or it is an array type.
+
+\subsubsection{Primitive type tokens}
+\label{sec:primitivetypetokens}
+The primitive datatype tokens are: \texttt{int, long, float, boolean, char, string, void}
+
+\subsubsection{Class names}
+Class names must start with a capital letter, followed by one or more letters of any case. Class names are encouraged to take the UpperCamelCase form but are not required to by the compiler. Class names cannot contain anything other than letters. Class names are identified by the regular expression \texttt{['A'-'Z']['a'-'z' 'A'-'Z']*}
+
+\subsubsection{Array types}
+Array types consist of a \hyperref[sec:primitivetypetokens]{primitive type token} followed by a [, followed by an \hyperref[sec:intliterals]{integer literal}, followed by a closing ].
+
+\subsection{Identifiers}
+Identifiers are case-sensitive. They consist of a lowercase letter followed by one or more lowercase letters, uppercase letters, numbers, or underscores in any order. Keywords cannot be used as identifiers, so if a keyword is seen it will always be tokenized as the keyword above and not the identifier. Identifiers are identified by the regular expression \texttt{['a'-'z']['a'-'z' 'A'-'Z' '0'-'9']*}
+
+\subsection{Operators}
+Python++ includes the following tokens for operators: \texttt{+ - * / \% = += -= *= /= == != } \texttt{>} \texttt{<} \texttt{>=} \texttt{<=}
+
+See \hyperref[sec:expr-mathematical-operators]{mathematical operators} and \hyperref[sec:expr-boolean-operators]{boolean operators} below for the semantic meaning of each operator.
+
+\subsubsection{Object operators}
+Python++ allows for users to define custom infix operators as syntactic sugar for classes. See \hyperref[sec:object-operators]{this} section for a complete code example. An object operator is defined to be one or more special characters. This is the precise regex: \texttt{['+' '-' '\%' '\&' '\$' '@' '!' '\#' '\^{}' '*' '/' '\~{}' '?' '}\texttt{>}\texttt{' '}\texttt{<}\texttt{']+}
+
+Note that if something matches both an object operator and a primitive operator, then the primitive operator token above will be emitted by the scanner/lexer.
+
+\subsection{Literals}
+Python++ supports integer literals, floating point literals, boolean literals, character literals, and string literals.
+
+\subsubsection{Integer literals}
+\label{sec:intliterals}
+Integer literals consist of one or more numbers between 0 and 9 next to each other. We do not support any syntax for numbers using \texttt{e}. The regular expression for int literals is \texttt{['0'-'9']+}
+
+\subsubsection{Long literals}
+\label{sec:longliterals}
+Long literals consist of an \hyperref[sec:intliterals]{integer literal} followed by the character `L'. For instance, ``500L'' would be treated as a literal for a long.
+
+\subsubsection{Floating point literals}
+Floating point literals consist of one or more numbers, followed by a period, followed by one or more numbers. We do not support any syntax for numbers using \texttt{e}. We also do not support starting a floating point with a period, such as in \texttt{.5}. The regular expression for float literals is \texttt{['0'-'9']+('.'['0'-'9']+)?}
+
+\subsubsection{Boolean literals}
+Boolean literals are either the string ``true'' or the string ''false''. These are case-sensitive, so ``True'' or ``FALSE'' will not match the boolean literal token. Boolean literals have a higher precedence than identifiers, so ``true'' and ``false'' always get tokenized as a boolean literal rather than an identifier. Thus ``true'' and ``false'' are not valid identifiers.
+
+\subsubsection{Character literals}
+Character literals consist of a single quote, followed by a single character, followed by a single quote. The exact regex to match character literals is \texttt{`.'} 
+
+\subsubsection{String literals}
+String literals consist of a double quote, followed by any character other than a double quote or newline, followed by a double quote. String literals \textbf{cannot} contain newlines or double quote characters in Python++.
+
+\subsection{Comments}
+Python++ supports both single-line and multi-line comments. Single-line comments start with a \texttt{\#} character and indicate that everything after the \texttt{\#} on that line is a comment and can be discarded.
+
+Alternatively, a comment can be started using \texttt{/\#} and closed using \texttt{\#/}. Comments starting with \texttt{/\#} are allowed to span multiple lines.
+
+\subsection{Punctuation}
+Python++ uses the following characters for punctuation: \texttt{( ) [ ] : . , \textunderscore} \newline
+
+\begin{itemize}
+\item Left and right parentheses can be used to group expressions and are also used to define and call functions.
+
+\item Left and right brackets are used for array literals and array access.
+
+\item Colons are used when defining classes and functions.
+
+\item Periods are used to invoke functions that are part of objects.
+
+\item Commas are used to separate parameters to function calls as well as array parameters.
+
+\item Underscores are used exclusively to indicate that a method in a class is an \hyperref[sec:object-operators]{object operator}.
+\end{itemize}
+
+\subsection{Syntactically significant whitespace}
+Python++ uses syntactically significant whitespace rather than curly braces or semi-colons. Python++ differs from Python in that spaces are not syntactically significant and only tab characters can be used.
+
+The \texttt{NEWLINE} character is used to indicate the end of each \hyperref[sec:stmt]{statement}. One \texttt{INDENT} token is used every time a line has increased indentation level compared to the previous indentation level. A \texttt{DEDENT} token is released for each corresponding decrease in the indentation level. 
+
+Consider the following code block for a concrete example:
+\begin{minted}[linenos]{python}
+int x = 5
+
+def foo(string y) returns void:
+    char c = 'c'
+    if x > 5:
+        if c == 'c':
+            println("foo")
+    elif: x > 10:
+        println("x was greater than 10")
+        
+println(1)
+
+\end{minted}
+An \texttt{INDENT} token would be emitted after the \texttt{NEWLINE} on line 3. Another would be emitted after the \texttt{NEWLINE} on lines 5, 6, and 8. No \texttt{INDENT} would be emitted after the \texttt{NEWLINE} on line 4, because line 5 is at the same level of indentations. Thus \texttt{INDENT} is not the same as how many tab characters were on a line. Two \texttt{DEDENT} tokens would be emitted after the \texttt{NEWLINE} on line 7, and one \texttt{DEDENT} would be emitted after the \texttt{NEWLINE} on line 10.
+
+\section{Syntax}
+\subsection{Conventions used in this manual}
+\label{sec:italicized-strings-in-lowercase}
+\label{sec:bar}
+A context-free grammar is used to specify valid syntax for Python++ programs. In this manual, nonterminal symbols will appear as \hyperref[sec:italicized-strings-in-lowercase]{\textit{italicized-strings-in-lowercase}} (clicking the nonterminal will open the section of the document where productions of that nonterminal are defined). Terminals will appear as uppercase strings in a monospaced font. For enhanced legibility, hyphens will be used to separate words within a nonterminal or terminal. An example of a terminal could be  \texttt{TERMINAL}. If there is more than one production for the same nonterminal symbol, the different alternatives will be listed on separate lines.
+
+An example of a production would be
+
+\begin{align*}
+    \textit{foo} &\to \hyperref[sec:bar]{\textit{bar}} \texttt{ } \texttt{BAZ}
+\end{align*}
+
+Which would mean the nonterminal \textit{foo} consists of the nonterminal \textit{bar} followed by the terminal \texttt{BAZ}.
+
+\subsection{Types}
+\subsubsection{Representation of primitives in memory}
+\begin{itemize}
+    \item \texttt{int} refers to a 32-bit integer and corresponds to \texttt{i32} in LLVM.
+    \item \texttt{long} refers to a 64-bit integer and corresponds to \texttt{i64} in LLVM.
+    \item \texttt{float} refers to a 32-bit floating point value and corresponds to \texttt{float} in LLVM.
+    \item \texttt{char} refers to an ASCII character and corresponds to the \texttt{i8} type in LLVM.
+    \item \texttt{string} refers to an array whose elements are all \texttt{char}. \texttt{string}'s are immutable in Python++.
+    \item \texttt{boolean} refers to a value that is either ``true'' or ``false'' and corresponds to the \texttt{i1} type in LLVM.
+\end{itemize}
+
+\subsubsection{Classes}
+The primitive types above can be combined to yield more powerful types. Python++ allows users to define objects which are ``manipulatable regions of storage'' which consist of a struct that has fields made up of primitive types or other objects. Classes in Python++ do not support inheritance.
+
+Formally, we say a class definition consists of only the following rule:
+
+\label{sec:classdecl}
+\begin{align*}
+    \textit{classdecl} &\to \texttt{CLASS} \text{ } \texttt{TYPE}: \texttt{NEWLINE} \text{ } \\
+    &\blank \texttt{INDENT} \texttt{ } \texttt{STATIC}: \text{ } \texttt{NEWLINE}  \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \text{ } \\
+    &\blank
+    \texttt{DEDENT} \texttt{ } \texttt{REQUIRED}: \text{ } \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ }  \hyperref[sec:vdecls]{\textit{vdecls}} \text{ } \texttt{NEWLINE} \text{ } \\
+    &\blank \texttt{DEDENT} \texttt{ } \texttt{OPTIONAL}: \text{ }  \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \\
+    &\blank \texttt{DEDENT} \texttt{ } \hyperref[sec:optional-fdecls]{\textit{optional-fdecls}} \texttt{ } \texttt{NEWLINE}
+\end{align*}
+
+The fact that the entries appear on different lines here does not indicate that there is more than one production here. This was purely a cosmetic choice since the real production, which should all go on a single line, is too long to fit on this page.
+
+Objects can be instantiated using the following rule.
+
+\label{sec:object-instantiation}
+\begin{align*}
+    \textit{object-instantiation} &\to \texttt{TYPE}(\hyperref[sec:params]{\textit{params}}) \\
+    &\to \texttt{TYPE}()
+\end{align*}
+
+That is to say, an object can be instantiated with or without parameters in its constructor.
+
+Fields within objects can be accessed directly (i.e. without needing to go through a function) using the following syntax:
+
+\label{sec:object-variable-access}
+\begin{align*}
+    \textit{object-variable-access} &\to \texttt{IDENTIFIER}.\texttt{IDENTIFIER} \\
+    &\to \texttt{SELF}.\texttt{IDENTIFIER}
+\end{align*}
+
+\texttt{SELF} is a keyword that allows the programmer to access an object's field from within the object itself.
+
+\subsubsection{Arrays}
+Arrays are available as an aggregate data type. Arrays can consist of any type, e.g. primitives, objects, or other arrays. Python++ does not allow for nested arrays, so something like \texttt{int[][] x} would not be legal.
+
+Arrays can be defined via the following array literal syntax:
+\label{sec:array-literal}
+\begin{align*}
+    \textit{array-literal} &\to [\hyperref[sec:params]{\textit{params}}] \\
+    &\to []
+\end{align*}
+
+The entry at a given index within an array is accessed via the following syntax:
+\label{sec:array-access}
+\begin{align*}
+    \textit{array-access} &\to \texttt{IDENTIFIER}[\hyperref[sec:expr]{\textit{expr}}]
+\end{align*}
+
+\subsection{Functions}
+\subsubsection{Function declarations}
+Functions in Python++ do not need to be declared within a class. Functions can either specify their return type using the \texttt{returns} keyword followed by a \texttt{TYPE}, or if this is absent the function will behave as though it returned \texttt{void}.
+
+\label{sec:fdecl}
+\begin{align*}
+    \textit{fdecl} &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}) \texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}): \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}() \texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(): \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{DEF} \texttt{ } \texttt{UNDERSCORE} \texttt{ } \texttt{OBJ-OPERATOR}(\texttt{TYPE IDENTIFIER})\texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+\end{align*}
+
+An optional block of function declarations can be defined using the following rules:
+\label{sec:optional-fdecls}
+\begin{align*}
+    \textit{optional-fdecls} &\to \hyperref[sec:optional-fdecls]{\textit{optional-fdecls}} \texttt{ } \hyperref[sec:fdecl]{\textit{fdecl}} \\
+    &\to \epsilon
+\end{align*}
+
+\subsubsection{Function calls}
+Functions can either be called directly or be called as methods on an object. Functions can be called with or without parameters.
+
+\label{sec:func-call}
+\begin{align*}
+    \textit{func-call} &\to \texttt{IDENTIFIER} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
+    &\to \texttt{SELF} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
+    &\to \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
+    &\to \texttt{IDENTIFIER} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}() \\
+    &\to \texttt{SELF} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}() \\
+    &\to \texttt{IDENTIFIER}() \\
+\end{align*}
+
+\subsection{Expressions}
+\label{sec:expr}
+\subsubsection{Literals}
+A literal by itself can be considered an expression. \texttt{NULL} is also considered an expression.
+
+Thus all of the following productions are valid expressions:
+\begin{align*}
+    \textit{expr} &\to \texttt{INT-LITERAL} \\
+    &\to \texttt{LONG-LITERAL} \\
+    &\to \texttt{FLOAT-LITERAL} \\
+    &\to \texttt{CHAR-LITERAL} \\
+    &\to \texttt{STRING-LITERAL} \\
+    &\to \texttt{BOOLEAN-LITERAL} \\
+    &\to \texttt{NULL} \\
+\end{align*}
+
+\subsubsection{Identifiers, functions, and classes}
+Identifiers by themselves are considered valid expressions. This applies whether the identifier is used on its own or it refers to a field inside an object. Instantiations of objects are also valid expressions.
+
+Thus all of the following productions are valid expressions:
+\begin{align*}
+    \textit{expr} &\to \texttt{IDENTIFIER} \\
+    &\to \hyperref[sec:object-instantiation]{\textit{object-instantiation}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \\
+    &\to \hyperref[sec:func-call]{\textit{func-call}} \\
+\end{align*}
+
+\subsubsection{Array expressions}
+Array expressions can be either an \textit{array-literal} or an \textit{array-access}. Thus the following productions are valid expressions:
+\begin{align*}
+    \textit{expr} &\to \hyperref[sec:array-literal]{\textit{array-literal}} \\
+    &\to \hyperref[sec:array-access]{\textit{array-access}} \\
+\end{align*}
+
+\subsubsection{Parentheses}
+Expressions can be wrapped in parentheses. The type and value of an expression are the same as that of the original expression. Parentheses allow for grouping of expressions to override the default precedence for \hyperref[sec:expr-mathematical-operators]{mathematical operators}.
+\begin{align*}
+    \textit{expr} &\to (\hyperref[sec:expr]{\textit{expr}}) \\
+\end{align*}
+
+\subsubsection{Mathematical operators}
+\label{sec:expr-mathematical-operators}
+\begin{align*}
+    \textit{expr} &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ + } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ - } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ * } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ / } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ \% } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ OBJ-OPERATOR } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{-}\hyperref[sec:expr]{\textit{expr}} \\
+\end{align*}
+
+\(+\) refers and \(-\) (when appearing between two expressions) refer to addition and subtraction, respectively, and group from left to right. They have equal precedence among themselves and are lower precedence than \(*\), \(/\), and \(\%\).
+
+\(*\), \(/\), and \(\%\) refer to multiplication, division, and modulo, respectively, and group from left to right. They have equal precedence among themselves and are higher precedence than \(+\) and \(-\).
+
+\texttt{OBJ-OPERATOR} refers to a user defined infix operator, which appears as a method prefixed by an underscore on the class. See \hyperref[sec:object-operators]{this} section for more information and a code sample.
+
+Unary minus, as in \(-\)\textit{expr}, refers to the negative sign and has a higher precedence than the other mathematical operators.
+
+\subsubsection{Assignments}
+Assignments are also expressions. Assignment operators all have the same precedence, and their precedence is lower than all other operators. Assignment operators are right associative.
+
+\label{sec:assign}
+\begin{align*}
+    \textit{assign} &\to \texttt{TYPE} \text{ }  \texttt{IDENTIFIER} \texttt{ = } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{IDENTIFIER} \texttt{ = } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ = } \hyperref[sec:expr]{\textit{expr}} \\
+\end{align*}
+
+Python++ also includes the update and assign operators \(+=\), \(-=\), \(*=\), and \(/=\). These refer to setting the new value of the left-hand side equal to the old value of the left-hand side plus/minus/times/divided by the value of the right-hand side, respectively.
+
+\label{sec:assign-update}
+\begin{align*}
+    \textit{assign-update} &\to \texttt{IDENTIFIER} \texttt{ += } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{IDENTIFIER} \texttt{ -= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{IDENTIFIER} \texttt{ *= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{IDENTIFIER} \texttt{ /= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ += } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ -= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ *= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ /= } \hyperref[sec:expr]{\textit{expr}} \\
+\end{align*}
+
+Thus the following are valid expressions:
+\begin{align*}
+    \textit{expr} &\to \hyperref[sec:assign]{\textit{assign}} \\
+    &\to \hyperref[sec:assign-update]{\textit{assign-update}} \\
+\end{align*}
+
+Assignments can also be placed in a block, one after the other.
+\label{sec:assigns}
+\begin{align*}
+    \textit{assigns} &\to \hyperref[sec:assign]{\textit{assign}} \\
+    &\to \hyperref[sec:assigns]{\textit{assigns}} \texttt{ } \texttt{NEWLINE} \texttt{ } \hyperref[sec:assign]{\textit{assign}} \\
+\end{align*}
+
+\subsubsection{Boolean operators}
+\label{sec:expr-boolean-operators}
+Python++ supports comparison operators such as greater than, greater than equals, less than, less than equals, not equals, and equals. The language also supports \texttt{not}, \texttt{or}, and \texttt{and}.
+
+All of the boolean operators are left associative. Their precedence, in ascending order of precedence, is \texttt{or}, \texttt{and}, \texttt{not}, followed by \texttt{==}, \texttt{!=}, \texttt{>}, \texttt{<}, \texttt{>=}, and \texttt{<=}, which all have the same level of precedence.
+
+Boolean operators rank above \hyperref[sec:assigns]{assignments} in terms of precedence but below \hyperref[sec:expr-mathematical-operators]{mathematical operators}.
+
+In sum, the valid expressions involving boolean operators are:
+\begin{align*}
+    \textit{expr} &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ == } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ != } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ > } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ < } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ >= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ <= } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \texttt{NOT} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ OR } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ AND } \hyperref[sec:expr]{\textit{expr}} \\
+\end{align*}
+
+\texttt{==} and \texttt{!=} check value based equality for primitive types and check pointer equality for user defined types. That is to say, if \texttt{==} or \texttt{!=} are used for user defined objects, they are only deemed equal/not equal based on whether the objects refer to the same location in memory or not, respectively.
+
+\subsection{High-level program structure}
+\subsubsection{The program}
+A program in Python++ is made up of one or more statements, function declarations, class declarations, or newlines in any order, ending with the \texttt{EOF} token.
+
+Formally, a program is:
+
+\label{sec:program}
+\begin{align*}
+    \textit{program} &\to \hyperref[sec:program-without-eof]{\textit{program-without-eof}} \texttt{ } \texttt{EOF} \\
+\end{align*}
+
+Where \textit{program-without-eof} is:
+
+\label{sec:program-without-eof}
+\begin{align*}
+    \textit{program-without-eof} &\to \hyperref[sec:program-without-eof]{\textit{program-without-eof}} \texttt{ } \hyperref[sec:stmt]{\textit{stmt}} \\
+    &\to \hyperref[sec:program-without-eof]{\textit{program-without-eof}} \texttt{ } \hyperref[sec:fdecl]{\textit{fdecl}} \\
+    &\to \hyperref[sec:program-without-eof]{\textit{program-without-eof}} \texttt{ } \hyperref[sec:classdecl]{\textit{classdecl}} \\
+    &\to \hyperref[sec:program-without-eof]{\textit{program-without-eof}} \texttt{ } \texttt{NEWLINE} \\
+    &\to \epsilon \\
+\end{align*}
+
+\subsection{Statements}
+Python++ makes a distinction between statements and expressions, even though both can have side effects and an expression by itself can be a statement. Each statement in Python++ is terminated by a \texttt{NEWLINE}. No semicolons are used in Python++.
+
+Python++ has four types of statements: expressions, return statements, if statements, and loops. Formally, these are specified as:
+
+\label{sec:stmt}
+\begin{align*}
+    \textit{stmt} &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{NEWLINE} \\
+    &\to \texttt{RETURN} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{NEWLINE} \\
+    &\to \hyperref[sec:if-stmt]{\textit{if-stmt}} \\
+    &\to \hyperref[sec:loop]{\textit{loop}} \\
+\end{align*}
+
+A group of statements can appear one after the other:
+
+\label{sec:stmts}
+\begin{align*}
+    \textit{stmts} &\to \hyperref[sec:stmt]{\textit{stmt}} \texttt{ } \texttt{NEWLINE} \\
+    &\to \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \hyperref[sec:stmt]{\textit{stmt}}  \\
+\end{align*}
+
+\subsubsection{If statements}
+Users can branch on conditionals using if statements. If statements can be used as solo if statements, if/else statements, or if/elif/else statements, with an arbitrary amount of elifs.
+
+Formally, if statements are defined as:
+\label{sec:if-stmt}
+\begin{align*}
+    \textit{if-stmt} &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \texttt{ELSE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \texttt{ } \texttt{ELSE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \\
+\end{align*}
+
+\label{sec:elif}
+Where \textit{elif} is defined as:
+\begin{align*}
+    \textit{elif} &\to \texttt{ELIF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \hyperref[sec:elif]{\textit{elif}} \texttt{ } \texttt{ELIF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+\end{align*}
+
+\subsubsection{Loop statements}
+Python++ only offers one kind of loop, a ``loop while'' construct that uses a novel syntax.
+
+\label{sec:loop}
+\begin{align*}
+    \textit{loop} &\to \texttt{LOOP} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{WHILE} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \texttt{LOOP} \texttt{ } \texttt{WHILE} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+\end{align*}
+
+\subsection{Parameters and variable declarations}
+As a statically typed language, Python++ requires function declarations to specify the types of parameters. This is done using the following grammar, where each typed parameter is separated by a comma:
+
+\label{sec:type-params}
+\begin{align*}
+    \textit{type-params} &\to \texttt{TYPE} \texttt{ } \texttt{IDENTIFIER} \\
+    &\to \hyperref[sec:type-params]{\textit{type-params}} \texttt{ }, \texttt{ } \texttt{TYPE} \texttt{ } \texttt{IDENTIFIER} \\
+\end{align*}
+
+Parameters written without their type are also available when making function calls and initializing array literals. Their syntax is:
+\label{sec:params}
+\begin{align*}
+    \textit{params} &\to \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:params]{\textit{params}} \texttt{ } , \texttt{ } \hyperref[sec:expr]{\textit{expr}}
+\end{align*}
+
+Variables can also be declared without being part of an assignment. This can be used to define the fields within a class.
+\label{sec:vdecl}
+\begin{align*}
+    \textit{vdecl} &\to \texttt{TYPE} \texttt{ } \texttt{IDENTIFIER}
+\end{align*}
+\label{sec:vdecls}
+\begin{align*}
+    \textit{vdecls} &\to \hyperref[sec:vdecl]{\textit{vdecl}} \\ &\to \hyperref[sec:vdecls]{\textit{vdecls}} \texttt{ } \texttt{NEWLINE} \texttt{ } \hyperref[sec:vdecl]{\textit{vdecl}}
+\end{align*}
+
+\subsection{Associativity and precedence table}
+The table is increasing order of precedence.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+Associativity   & Operator(s) \\ \hline
+right           & \texttt{= += -= *= /=} \\ \hline
+left            & \texttt{OR} \\ \hline
+left            & \texttt{AND} \\ \hline
+left            & \texttt{NOT} \\ \hline
+left            & \texttt{== != > < >= <=} \\ \hline
+left            & \texttt{+ -} \\ \hline
+left            & \texttt{* / \%} \\ \hline
+left            & \texttt{OBJ-OPERATOR} \\ \hline
+non-associative & \texttt{UNARY-MINUS} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Semantics}
+\subsection{Declaration rules}
+Variables must be defined before they are used. Semantically,
+\begin{minted}{python}
+int x = 5
+println(x)  # prints 5
+\end{minted}
+is legal but 
+\begin{minted}{python}
+x = 5
+\end{minted}
+is not. The initial declaration of a variable must include its type, but afterwards it can be modified/reassigned without specifying its type. However, when this is done, the new value being assigned to it must match its original value.
+
+Thus,
+\begin{minted}{python}
+int x = 5
+x = 6
+println(x)  # prints 6
+\end{minted}
+is legal but
+\begin{minted}{python}
+int x = 5
+x = "foo"
+println(x)
+\end{minted}
+is not, because x was declared to be an \texttt{int} but the next line is trying to assign a \texttt{string} to it.
+
+\subsection{Scoping rules}
+Scoping is determined by the level of indentation. A variable's scope applies starting on its level of indentation and all subsequent lines that have an indentation level greater than or equal to the indentation level of the most recent declaration or assignment.
+
+Consider the following program as an example:
+
+\begin{minted}{python}
+int x = 5
+println(x)  # prints 5
+def foo(int x) returns int:
+    x = x + 1
+    return x
+
+println(foo(5))  # prints 6
+
+if true:
+    int x = 20
+    println(x)  # prints 20
+    
+println(x)  # prints 5
+\end{minted}
+
+Inside of classes, there is no concept of a public or private variable. All fields within classes are public and are visible throughout the class.
+
+\subsection{Function parameters are passed by value}
+Python++ passes by value. Objects are passed using the Java style, which is like ``passing by value of the reference.'' The following code sample elucidates passing primitives and objects into functions. 
+
+\begin{minted}{python}
+class MyObject:
+    required:
+        int x
+        int y
+        int z
+
+MyObject my_object = MyObject(1, 2, 3)
+
+int primitive_param = 1
+
+# Before we call my_function_1, everything is as expected.
+println(my_object.x)  # prints 1
+println(my_object.y)  # prints 2
+println(my_object.z)  # prints 3
+println(primitive_param)  # prints 1
+
+def my_function_1(MyObject object_param, int primitive_param):
+    object_param.x = 500
+    object_param.y = 500
+    object_param.z = 500
+    primitive_param = 500
+    
+my_function_1(my_object, primitive_param)
+
+# After we call my_function_1, the object was mutated but the primitive param was not.
+println(my_object.x)  # prints 500
+println(my_object.y)  # prints 500
+println(my_object.z)  # prints 500
+println(primitive_param)  # prints 1
+
+def my_function_2(MyObject object_param):
+    object_param = MyObject(20, 20, 20)
+    
+my_old_object = my_object
+my_function_2(my_object)
+println(my_old_object == my_object)  # prints "true"
+\end{minted}
+
+\subsection{Mutability}
+Objects in Python++ are mutable by default. Strings and primitives are immutable.
+
+\section{Conversions}
+Some operators in Python++ can cause conversion of the value of the operands from one type to another.  
+
+\subsection{Floats and Integers}
+When floats and ints are combined in Python++ arithmetic, the integer is treated as a floating point number and the result is always a float.  This includes arithmetic expressions that include longs. If a long and an int are combined in any arithmetic operator, the result is always of type long.
+
+\subsection{Characters and Strings}
+When a character is added to a string using the \texttt{+} operator for concatenation, i.e. `c' \texttt{+} ``haracter", the resulting data type is a string, in this case ``character".  This string type conversion also occurs when 2 characters are concatenated, e.g. `o'+`k' \texttt{==} ``ok".  Use of the \texttt{+} operator between chars and/or strings always converts to a string.
+
+\subsection{Object operators}
+\label{sec:object-operators}
+
+Python++ objects may also contain user-defined infix operator definitions in the form of special function definitions that define how objects work with operators.  The type used in the parameter within the function declaration defines what types can work on the right hand side of the operator.  The return type of the expression is defined by the return  type of the function.  
+
+The following sample code demonstrates how the custom infix operators work in practice:
+\begin{minted}{python}
+class MyClass:
+    required:
+        int x
+        int y
+
+    def _+(MyClass b) returns MyClass: # addition function
+        return MyClass(self.x+b.x, self.y+b.y)
+
+    def _-(MyClass b) returns MyClass: # subtraction function
+        return MyClass(self.x-b.x, self.y-b.y)
+        
+    def _%%%(MyClass b) returns int:
+        return self.x * b.x
+        
+MyClass instA = MyClass(1, 3)
+MyClass instB = MyClass(2, 2)
+MyClass sum = instA + instB # compiler will convert this to instA._+(instB)
+MyClass difference = instA - instB # compiler will convert this to instA._-(instB)
+int num = instA %%% instB  # compiler will convert this to instA._%%%(instB)
+println(sum.x) # prints '3'
+println(sum.y) # prints '5'
+println(difference.x) # prints '-1'
+println(difference.y) # prints '1'
+println(num) # prints '2'
+\end{minted}}
+
+\end{document}
