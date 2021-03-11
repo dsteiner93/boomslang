@@ -16,12 +16,11 @@ let _ =
     (* returns a list of n DEDENT tokens *)
     let rec get_dedent_list = function
       | 1            -> [Parser.DEDENT]
-      | n when n > 1 -> (get_dedent_list (n - 1)) @  [Parser.DEDENT]
+      | n when n > 1 -> [Parser.DEDENT] @ get_dedent_list (n - 1)
       | _            -> [] in
     (* helper for List.fold_left later *)
     let helper s e = match e with
-      | Parser.DEDENT, n   -> s @ [Parser.NEWLINE] @ (get_dedent_list n)
-      | Parser.NINDENT, _  -> s @ [Parser.NEWLINE] @ [Parser.INDENT]
+      | Parser.DEDENT, n   -> s @ (get_dedent_list n)
       | tok, _             -> s @ [tok] in
     List.fold_left helper [] arr in
 
@@ -33,6 +32,7 @@ let _ =
       | [] -> Parser.EOF
       | h::t -> token_list := t; h in
 
+  (* run the token list through the parser *) 
   let str = Parser.program token (Lexing.from_string "") in
   let result = eval str in
   print_endline (result)

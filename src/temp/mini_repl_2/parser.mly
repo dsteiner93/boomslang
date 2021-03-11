@@ -1,10 +1,10 @@
 %{ open Ast %}
 
-%token TAB NEWLINE INDENT EOF DEDENT NINDENT
+%token TAB NEWLINE INDENT EOF DEDENT
 %token <string> NAME
 %token <int> NDEDENTN
 
-%left TAB NEWLINE NAME INDENT NINDENT NDEDENTN DEDENT
+%left TAB NEWLINE NAME INDENT NDEDENTN DEDENT
 
 %start program
 %type <Ast.str> program
@@ -21,14 +21,15 @@ test:
 seq:
 | token { [($1, 0)] }
 | NDEDENTN { [(DEDENT, $1)] }
+| NDEDENTN seq { (DEDENT, $1)::$2 }
 | token seq { ($1, 0)::$2 }
 
 token:
 | TAB { TAB }
 | NEWLINE { NEWLINE }
-| NINDENT { NINDENT }
 | NAME { NAME($1) }
 | DEDENT { DEDENT }
+| INDENT { INDENT }
 
 
 
