@@ -47,57 +47,58 @@
 %%
 
 program:
-  program_without_eof EOF {}
+  program_without_eof EOF { $1 }
 
 program_without_eof:
-  program_without_eof stmt {}
-| program_without_eof fdecl {}
-| program_without_eof classdecl {}
+  program_without_eof stmt { { p_stmts=$2 :: $1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls=$1.p_classdecls } } 
+| program_without_eof fdecl { { p_stmts=$1.p_stmts; p_fdecls = $2 :: $1.p_fdecls; p_classdecls=$1.p_classdecls } }
+| program_without_eof classdecl { { p_stmts=$1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls=$2 :: $1.p_classdecls } }
 | program_without_eof NEWLINE {}
-| /* nothing */ {}
+| /* nothing */ { { p_stmts=[]; p_fdecls=[]; p_classdecls=[]; } }
 
 optional_fdecls:
   optional_fdecls fdecl {}
 | /* nothing */ {}
 
 fdecl:
-  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
+  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {
+    { fname = $2; formals = List.rev $4; typ = $8 ; body = List.rev $11} }
 | DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT {}
 | DEF IDENTIFIER LPAREN RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
 | DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT {}
 | DEF UNDERSCORE OBJ_OPERATOR LPAREN TYPE IDENTIFIER RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
 
 stmts:
-  stmt {}
-| stmts stmt {}
+  stmt { [$1] }
+| stmts stmt { $2 :: $1 }
 
 stmt:
-  expr NEWLINE {}
-| RETURN expr NEWLINE {}
-| if_stmt  {}
-| loop {}
+  expr NEWLINE { Expr $1 }
+| RETURN expr NEWLINE { Return $2 }
+| if_stmt  { $1 }
+| loop { $1 }
 
 if_stmt:
-  IF expr COLON NEWLINE INDENT stmts DEDENT {}
-| IF expr COLON NEWLINE INDENT stmts DEDENT ELSE COLON NEWLINE INDENT stmts DEDENT {}
-| IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE COLON NEWLINE INDENT stmts DEDENT {}
-| IF expr COLON NEWLINE INDENT stmts DEDENT elif {}
+  IF expr COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, [], []) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT ELSE COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, [], List.rev $12) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, List.rev $8, List.rev $13) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT elif { If($2, List.rev $6, List.rev $8, []) }
 
 elif:
-  ELIF expr COLON NEWLINE INDENT stmts DEDENT {}
-| elif ELIF expr COLON NEWLINE INDENT stmts DEDENT {}
+  ELIF expr COLON NEWLINE INDENT stmts DEDENT { [($2, List.rev $6)] }
+| elif ELIF expr COLON NEWLINE INDENT stmts DEDENT { ($3, List.rev $7) :: $1 }
 
 loop:
-  LOOP expr WHILE expr COLON NEWLINE INDENT stmts DEDENT {}
-| LOOP WHILE expr COLON NEWLINE INDENT stmts DEDENT {}
+  LOOP expr WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop($2, $4, List.rev $8) }
+| LOOP WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop(NullExpr, $3, List.rev $7) }
 
 type_params:  /* these are the method signature type */
-  TYPE IDENTIFIER {}
+  TYPE IDENTIFIER { $1 is the type, which is just a string. then we need to convert that to ast.ml typ object. $2 }
 | type_params COMMA TYPE IDENTIFIER {}
 
 params: /* these are the params used to invoke a function */
-  expr {}
-| params COMMA expr {}
+  expr { [$1] }
+| params COMMA expr { $3 :: $1 }
 
 classdecl:
   CLASS TYPE COLON NEWLINE
@@ -133,12 +134,12 @@ assign_update:
 | object_variable_access DIVIDE_EQ expr {}
 
 func_call:
-  IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN {}
-| SELF PERIOD IDENTIFIER LPAREN params RPAREN {}
-| IDENTIFIER LPAREN params RPAREN {}
-| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN {}
-| SELF PERIOD IDENTIFIER LPAREN RPAREN {}
-| IDENTIFIER LPAREN RPAREN {}
+  IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { Call($1, $3, List.rev $5) }
+| SELF PERIOD IDENTIFIER LPAREN params RPAREN { Call($3, List.rev $5) }
+| IDENTIFIER LPAREN params RPAREN { Call($1, List.rev $3) }
+| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { Call($1, $3) }
+| SELF PERIOD IDENTIFIER LPAREN RPAREN { Call($3) }
+| IDENTIFIER LPAREN RPAREN { Call($1) }
 
 object_instantiation:
   TYPE LPAREN params RPAREN {}
@@ -156,14 +157,14 @@ array_literal:
 | LBRACKET RBRACKET {}
 
 expr:
-  INT_LITERAL {}
-| LONG_LITERAL {}
-| FLOAT_LITERAL {}
-| CHAR_LITERAL {}
+  INT_LITERAL { IntLiteral($1) }
+| LONG_LITERAL { LongLiteral($1) }
+| FLOAT_LITERAL { FloatLiteral($1) }
+| CHAR_LITERAL { CharLiteral}
 | STRING_LITERAL {}
 | BOOLEAN_LITERAL {}
 | IDENTIFIER {}
-| NULL {}
+| NULL { NullExpr }
 | func_call {}
 | object_instantiation {}
 | object_variable_access {}
@@ -176,7 +177,7 @@ expr:
 | expr DIVIDE expr {}
 | expr MODULO expr {}
 | expr OBJ_OPERATOR expr {}
-| MINUS expr %prec UNARY_MINUS {}
+| MINUS expr %prec UNARY_MINUS { Unop(Neg, $2) }
 | assign {}
 | assign_update {}
 | expr DOUBLE_EQ expr {}
@@ -188,4 +189,3 @@ expr:
 | NOT expr {}
 | expr OR expr {}
 | expr AND expr {}
-
