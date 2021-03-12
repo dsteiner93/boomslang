@@ -44,9 +44,17 @@ type expr =
 | Id of string
 | NullExpr
 | Call of call
+| Paren of expr
+| ObjectInstantiation of typ * expr list
+| ObjectVariableAccess of string * string
+| ArrayAccess of string * expr
+| ArrayLiteral of expr list
 | Binop of expr * binop * expr
 | Unop of  uop * expr
-| Paren of expr
+| Assign of assign
+
+type assign
+
 
 type binop = Plus | Subtract | Times | Divide | Modulo | ObjOperator | DoubleEq | NotEq | GT | LT | GTE | LTE | OR | AND
 

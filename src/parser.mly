@@ -135,57 +135,57 @@ assign_update:
 
 func_call:
   IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { Call($1, $3, List.rev $5) }
-| SELF PERIOD IDENTIFIER LPAREN params RPAREN { Call($3, List.rev $5) }
+| SELF PERIOD IDENTIFIER LPAREN params RPAREN { Call("self", $3, List.rev $5) }
 | IDENTIFIER LPAREN params RPAREN { Call($1, List.rev $3) }
-| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { Call($1, $3) }
-| SELF PERIOD IDENTIFIER LPAREN RPAREN { Call($3) }
-| IDENTIFIER LPAREN RPAREN { Call($1) }
+| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { Call($1, $3, []) }
+| SELF PERIOD IDENTIFIER LPAREN RPAREN { Call("self", $3, []) }
+| IDENTIFIER LPAREN RPAREN { Call($1, []) }
 
 object_instantiation:
-  TYPE LPAREN params RPAREN {}
-| TYPE LPAREN RPAREN {}
+  TYPE LPAREN params RPAREN { ObjectInstantiation(TODO, List.rev $3) }
+| TYPE LPAREN RPAREN { ObjectInstantiation(TODO) }
 
 object_variable_access:
-  IDENTIFIER PERIOD IDENTIFIER {}
-| SELF PERIOD IDENTIFIER {}
+  IDENTIFIER PERIOD IDENTIFIER { ObjectVariableAccess($1, $3) }
+| SELF PERIOD IDENTIFIER { ObjectVarialbeAccess("self", $3) }
 
 array_access:
-  IDENTIFIER LBRACKET expr RBRACKET {}
+  IDENTIFIER LBRACKET expr RBRACKET { ArrayAccess($1, $3)}
 
 array_literal:
-  LBRACKET params RBRACKET {}
-| LBRACKET RBRACKET {}
+  LBRACKET params RBRACKET { ArrayLiteral(List.rev $2) }
+| LBRACKET RBRACKET { ArrayLiteral([]) }
 
 expr:
   INT_LITERAL { IntLiteral($1) }
 | LONG_LITERAL { LongLiteral($1) }
 | FLOAT_LITERAL { FloatLiteral($1) }
-| CHAR_LITERAL { CharLiteral}
-| STRING_LITERAL {}
-| BOOLEAN_LITERAL {}
-| IDENTIFIER {}
+| CHAR_LITERAL { CharLitera($1) }
+| STRING_LITERAL { StringLiteral($1) }
+| BOOLEAN_LITERAL { BoolLiteral($1) }
+| IDENTIFIER { Id($1) }
 | NULL { NullExpr }
-| func_call {}
-| object_instantiation {}
-| object_variable_access {}
-| array_access {}
-| array_literal {}
-| LPAREN expr RPAREN {}
-| expr PLUS expr {}
-| expr MINUS expr {}
-| expr TIMES expr {}
-| expr DIVIDE expr {}
-| expr MODULO expr {}
-| expr OBJ_OPERATOR expr {}
+| func_call { $1 }
+| object_instantiation { $1 }
+| object_variable_access { $1 }
+| array_access { $1 }
+| array_literal { $1 }
+| LPAREN expr RPAREN { Paren $2 }
+| expr PLUS expr { Binop($1, Plus, $3)}
+| expr MINUS expr { Binop($1, Subtract, $3) }
+| expr TIMES expr { Binop($1, Times, $3) }
+| expr DIVIDE expr { Binop($1, Divide, $3) }
+| expr MODULO expr { Binop($1, Modulo, $3) }
+| expr OBJ_OPERATOR expr { Binop($1, ObjOperator, $3) }
 | MINUS expr %prec UNARY_MINUS { Unop(Neg, $2) }
 | assign {}
 | assign_update {}
-| expr DOUBLE_EQ expr {}
-| expr NOT_EQ expr {}
-| expr GT expr {}
-| expr LT expr {}
-| expr GTE expr {}
-| expr LTE expr {}
-| NOT expr {}
-| expr OR expr {}
-| expr AND expr {}
+| expr DOUBLE_EQ expr { Binop($1, DoubleEq, $3) }
+| expr NOT_EQ expr { Binop($1, NotEq, $3) }
+| expr GT expr { Binop($1, GT, $3) }
+| expr LT expr { Binop($1, LT, $3) }
+| expr GTE expr { Binop($1, GTE, $3) }
+| expr LTE expr { Binop($1, LTE, $3) }
+| NOT expr { Unop(Not, $2) }
+| expr OR expr { Binop($1, Or, $3) }
+| expr AND expr { Binop($1, And, $3) }
