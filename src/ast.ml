@@ -17,18 +17,12 @@ type bind = typ * string
 // my_func(1, [1,2], Object())
 // parser will see DEF IDENTIFIER LPAREN TYPE IDENTIFIER COMMA TYPE IDENTIFIER COMMA TYPE IDENTIFIER RPAREN RETURNS TYPE
 
-type fdecl = {
-  return_type: typ;
-  fname: string;
-  formals: bind list;
-  body: stmt list;
-}
-
 type stmt =
   Expr of expr
 | Return of expr
 | If of expr * stmt list * elif list * stmt list
 | Loop of expr * expr * stmt list
+| Func of typ * string * bind list * stmt list
 
 //LOOP expr WHILE expr:NEWLINE INDENT stmts DEDENT
 

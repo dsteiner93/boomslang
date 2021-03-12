@@ -42,38 +42,26 @@
 %nonassoc UNARY_MINUS
 
 %start program /* the entry point */
-%type <Ast.program> program
+%type <Ast.program list> program
 
 %%
 
 program:
-  program_without_eof EOF { $1 }
-
-program_without_eof:
-  program_without_eof stmt { { p_stmts=$2 :: $1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls=$1.p_classdecls } } 
-| program_without_eof fdecl { { p_stmts=$1.p_stmts; p_fdecls = $2 :: $1.p_fdecls; p_classdecls=$1.p_classdecls } }
-| program_without_eof classdecl { { p_stmts=$1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls=$2 :: $1.p_classdecls } }
-| program_without_eof NEWLINE {}
-| /* nothing */ { { p_stmts=[]; p_fdecls=[]; p_classdecls=[]; } }
+  stmts EOF { List.rev $1 }
 
 optional_fdecls:
   optional_fdecls fdecl {}
 | /* nothing */ {}
 
-fdecl:
-  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {
-    { fname = $2; formals = List.rev $4; typ = $8 ; body = List.rev $11} }
-| DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT {}
-| DEF IDENTIFIER LPAREN RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
-| DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT {}
-| DEF UNDERSCORE OBJ_OPERATOR LPAREN TYPE IDENTIFIER RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT {}
 
 stmts:
-  stmt { [$1] }
+  { [] }
 | stmts stmt { $2 :: $1 }
 
 stmt:
   expr NEWLINE { Expr $1 }
+| classdecl { $1 }
+| fdecl { $1 }
 | RETURN expr NEWLINE { Return $2 }
 | if_stmt  { $1 }
 | loop { $1 }
@@ -84,6 +72,13 @@ if_stmt:
 | IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, List.rev $8, List.rev $13) }
 | IF expr COLON NEWLINE INDENT stmts DEDENT elif { If($2, List.rev $6, List.rev $8, []) }
 
+fdecl:
+  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { Func($7, $2, List.rev $4, List.rev $11) }
+| DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT { Func([], $2, List.rev $4, List.rev $9) }
+| DEF IDENTIFIER LPAREN RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { Func($6, $2, [], List.rev $10) }
+| DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT { Func([], $2, [], List.rev $8) }
+| DEF UNDERSCORE OBJ_OPERATOR LPAREN TYPE IDENTIFIER RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { } /* TODO */
+
 elif:
   ELIF expr COLON NEWLINE INDENT stmts DEDENT { [($2, List.rev $6)] }
 | elif ELIF expr COLON NEWLINE INDENT stmts DEDENT { ($3, List.rev $7) :: $1 }
@@ -93,8 +88,8 @@ loop:
 | LOOP WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop(NullExpr, $3, List.rev $7) }
 
 type_params:  /* these are the method signature type */
-  TYPE IDENTIFIER { $1 is the type, which is just a string. then we need to convert that to ast.ml typ object. $2 }
-| type_params COMMA TYPE IDENTIFIER {}
+  TYPE IDENTIFIER { [($1, $2)] } /* $1 is the type, which is just a string. then we need to convert that to ast.ml typ object. $2 } */
+| type_params COMMA TYPE IDENTIFIER { ($3, $4) :: $1 }
 
 params: /* these are the params used to invoke a function */
   expr { [$1] }
