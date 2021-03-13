@@ -1,32 +1,19 @@
-type program = {
-  p_stmts: stmt list;
-  p_fdecls: fdecl list;
-  p_classdecls: classdecl list;
-}
-
 type primitive = Int | Long | Float | Char | String | Bool | Void
+
+type binop = Plus | Subtract | Times | Divide | Modulo | ObjOperator | DoubleEq | NotEq | BoGT | BoLT | BoGTE | BoLTE | BoOr | BoAnd
+
+type uop = Not | Neg
+
+type update_op = Eq | PlusEq | MinusEq | TimesEq | DivideEq
 
 type typ = 
   Primitive of primitive
 | Class of string
-| Array of typ
+| Array of typ * int
 
 type bind = typ * string
 
-// def my_func(int x, Object[] myarray, Object my_object) returns MyOtherObject
-// my_func(1, [1,2], Object())
-// parser will see DEF IDENTIFIER LPAREN TYPE IDENTIFIER COMMA TYPE IDENTIFIER COMMA TYPE IDENTIFIER RPAREN RETURNS TYPE
-
-type stmt =
-  Expr of expr
-| Return of expr
-| If of expr * stmt list * elif list * stmt list
-| Loop of expr * expr * stmt list
-| Func of typ * string * bind list * stmt list
-
-//LOOP expr WHILE expr:NEWLINE INDENT stmts DEDENT
-
-type elif = expr * stmt list
+type object_variable_access = string * string
 
 type expr =
   IntLiteral of int
@@ -40,20 +27,48 @@ type expr =
 | Call of call
 | Paren of expr
 | ObjectInstantiation of typ * expr list
-| ObjectVariableAccess of string * string
+| ObjectVariableAccess of object_variable_access
 | ArrayAccess of string * expr
 | ArrayLiteral of expr list
 | Binop of expr * binop * expr
 | Unop of  uop * expr
 | Assign of assign
+| Update of update
+and call =
+  FuncCall of string * expr list (* my_func(1, 2, 3) *)
+| MethodCall of string * string * expr list (* object.identifier(params) *)
+and assign =
+  RegularAssign of typ * string * expr
+| ObjectVariableAssign of object_variable_access * expr
+and update =
+  RegularUpdate of string * update_op * expr
+| ObjectVariableUpdate of object_variable_access * update_op * expr
 
-type assign
+type stmt =
+  Expr of expr
+| Return of expr
+| If of expr * stmt list * elif list * stmt list
+| Loop of expr * expr * stmt list
+and elif = expr * stmt list
 
+type fdecl = {
+  rtype: typ;
+  fname: string;
+  formals: bind list;
+  body: stmt list;
+}
 
-type binop = Plus | Subtract | Times | Divide | Modulo | ObjOperator | DoubleEq | NotEq | GT | LT | GTE | LTE | OR | AND
+type classdecl = {
+  cname: string;
+  static_vars: assign list;
+  required_vars: bind list;
+  optional_vars: assign list;
+  methods: fdecl list;
+}
 
-type uop = Not | Neg
+type program = {
+  p_stmts: stmt list;
+  p_fdecls: fdecl list;
+  p_classdecls: classdecl list;
+}
 
-type call = 
-  string * (expr list) (* my_func(1, 2, 3) *)
-| string * string * expr list (* object.identifier(params) *)

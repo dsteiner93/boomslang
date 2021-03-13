@@ -16,6 +16,9 @@ repl : parser.cmo scanner.cmo repl.cmo
 %.cmi : %.mli
 	ocamlc -w +a -c $<
 
+%.cmi : %.ml
+	ocamlc -w +a -c $<
+
 scanner.ml : scanner.mll
 	ocamllex $^
 
@@ -37,7 +40,7 @@ scanner.cmx : parser.cmx
 ##############################
 
 TARFILES = README Makefile \
-	scanner.mll ast.mli parser.mly repl.ml repl.tb
+	scanner.mll ast.ml parser.mly repl.ml repl.tb
 
 pythonplusplus.tar.gz : $(TARFILES)
 	cd .. && tar zcf project/pythonplusplus.tar.gz $(TARFILES:%=hw1/%)
@@ -46,7 +49,7 @@ pythonplusplus.tar.gz : $(TARFILES)
 clean :
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
-        repl.out repl __pycache__
+        repl.out repl a.out __pycache__
 
 test :
 	python3 -m unittest run_tests

@@ -39,7 +39,8 @@ class TestLexerAndParser(unittest.TestCase):
   def assertFailed(self, stdout, stderr):
     self.assertEqual(b"", stdout)
     self.assertTrue(b"lexing: empty token" in stderr or
-                    b"Stdlib.Parsing.Parse_error" in stderr)
+                    b"Stdlib.Parsing.Parse_error" in stderr or
+                    b"Illegal" in stderr)
 
   def assertProgram(self, program, passes=True):
     self.make()
@@ -90,11 +91,19 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_simple_assignment_passes_2(self):
-    program = b"float yEs = -2.5 \n"
+    program = b"float yEs = .5 \n"
     self.assertProgramPasses(program)
 
   def test_simple_assignment_passes_3(self):
     program = b"string foo = myfunction(1+1+2+3+5)\n"
+    self.assertProgramPasses(program)
+
+  def test_simple_assignment_passes_4(self):
+    program = b"float yEs = -.5 \n"
+    self.assertProgramPasses(program)
+
+  def test_simple_assignment_passes_5(self):
+    program = b"float yEs = -2.5 \n"
     self.assertProgramPasses(program)
 
   def test_assignment_without_type_passes(self):
@@ -285,7 +294,7 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramFails(program)
 
   def test_invalid_floating_point_fails(self):
-    program = b"float v = .5\n"
+    program = b"float v = 1.\n"
     self.assertProgramFails(program)
 
   def test_invalid_plus_eq(self):
@@ -312,11 +321,11 @@ class TestLexerAndParser(unittest.TestCase):
     program = b"woof = woofwoof ?= harry\n"
 
   def test_invalid_char_literal_fails(self):
-    program = b"char c = ''\n"
+    program = u"char c = '😀'".encode('utf-16')
     self.assertProgramFails(program)
 
   def test_invalid_string_literal_fails(self):
-    program = b'string x = "fOOOO \n foo"\n'
+    program = u'string x = "fOOOO 😀 foo"\n'.encode('utf-16')
     self.assertProgramFails(program)
 
 

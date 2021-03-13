@@ -8,10 +8,6 @@ module StringMap = Map.Make(String)
 
 let add_entry map pair = StringMap.add (fst pair) (snd pair) map
 
-let primitive_types = [
-  "int"; "long"; "float"; "boolean"; "char"; "string"; "void";
-]
-
 let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   (* Boolean operators *)
   ("not", NOT); ("or", OR); ("and", AND);
@@ -21,6 +17,9 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   ("def", DEF); ("class", CLASS); ("self", SELF);
   ("return", RETURN); ("returns", RETURNS);
   ("static", STATIC); ("required", REQUIRED); ("optional", OPTIONAL);
+  (* Primitive data types *)
+  ("int", INT); ("long", LONG); ("float", FLOAT); ("boolean", BOOLEAN);
+  ("char", CHAR); ("string", STRING); ("void", VOID);
 ]
 
 let strip_firstlast str =
@@ -75,37 +74,31 @@ rule tokenize = parse
 | int_literal"L" as lit {
     LONG_LITERAL(Int64.of_string (String.sub lit 0 (String.length lit - 1)))
 }
-| ['0'-'9']+('.'['0'-'9']+)? as lit { FLOAT_LITERAL(float_of_string lit) }
+| ['0'-'9']+('.'['0'-'9']+)? | '.'['0'-'9']+ as lit { FLOAT_LITERAL(lit) }
 | "true" { BOOLEAN_LITERAL(true) }
 | "false" { BOOLEAN_LITERAL(false) }
 (* Char literals are single quotes followed by any single character
    followed by a single quote *)
-| '\'' _ '\'' as lit { CHAR_LITERAL( (strip_firstlast lit).[0] ) }
+| '\'' [' '-'~'] '\'' as lit { CHAR_LITERAL( (strip_firstlast lit).[0] ) }
 (* String literals in Python++ cannot contain double quotes or newlines.
    String literals are a " followed by any non newline or double quote
    followed by " *)
 | '"' ([^'"''\n'])* '"' as lit { STRING_LITERAL(strip_firstlast lit) }
 (* TODO syntactically meaningful whitespace - must keep track of INDENT *)
 (* User defined types, i.e. class names *)
-| class_name as t { TYPE(t) }
-(* Array/List type. Lists can be of primitives or objects *)
-| class_name"["int_literal"]" | "int["int_literal"]" |
-  "long["int_literal"]" | "float["int_literal"]" |
-  "boolean["int_literal"]" | "char["int_literal"]" |
-  "string["int_literal"]" as t { TYPE(t) }
+| class_name as t { CLASS_NAME(t) }
 (* If we see a lowercase letter followed by any letters or digits,
    it could either be the name of a primitive type (e.g. int), or
    a reserved word (e.g. class) or an identifier for a variable. *)
 | ['a'-'z']['a'-'z' 'A'-'Z' '0'-'9' '_']* as possible_id {
-    if List.mem possible_id primitive_types
-      then TYPE(possible_id)
-    else if StringMap.mem possible_id reserved_word_to_token
+    if StringMap.mem possible_id reserved_word_to_token
       then StringMap.find possible_id reserved_word_to_token
     else
       IDENTIFIER(possible_id)
   }
 | ['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<']+ as lit { OBJ_OPERATOR(lit) }
 | eof { EOF }
+| _ as char { raise (Failure("Illegal character: " ^ Char.escaped char)) }
 
 
 and multi_comment = parse

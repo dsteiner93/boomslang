@@ -1,5 +1,9 @@
-%{ %}
+%{
+open Ast
+%}
 
+/* Primitive types */
+%token INT LONG FLOAT BOOLEAN CHAR STRING VOID
 /* Boolean operators */
 %token NOT OR AND
 /* Loops and conditionals */
@@ -21,11 +25,11 @@
 /* Parameterized tokens */
 %token <int> INT_LITERAL
 %token <int64> LONG_LITERAL
-%token <float> FLOAT_LITERAL
+%token <string> FLOAT_LITERAL
 %token <char> CHAR_LITERAL
 %token <string> STRING_LITERAL
 %token <bool> BOOLEAN_LITERAL
-%token <string> TYPE
+%token <string> CLASS_NAME
 %token <string> IDENTIFIER
 %token <string> OBJ_OPERATOR
 
@@ -42,17 +46,23 @@
 %nonassoc UNARY_MINUS
 
 %start program /* the entry point */
-%type <Ast.program list> program
+%type <Ast.program> program
 
 %%
 
 program:
-  stmts EOF { List.rev $1 }
+  program_without_eof EOF { { p_stmts = List.rev $1.p_stmts; p_fdecls = List.rev $1.p_fdecls; p_classdecls = List.rev $1.p_classdecls; } }
+
+program_without_eof:
+  program_without_eof stmt { { p_stmts = $2::$1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls = $1.p_classdecls; } }
+| program_without_eof fdecl { { p_stmts = $1.p_stmts; p_fdecls = $2::$1.p_fdecls; p_classdecls = $1.p_classdecls; } }
+| program_without_eof classdecl { { p_stmts = $1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls = $2::$1.p_classdecls; } }
+| program_without_eof NEWLINE { $1 }
+| /* nothing */ { { p_stmts = []; p_fdecls = []; p_classdecls = []; } }
 
 optional_fdecls:
-  optional_fdecls fdecl {}
-| /* nothing */ {}
-
+  optional_fdecls fdecl { $2::$1 }
+| /* nothing */ { [] }
 
 stmts:
   { [] }
@@ -60,127 +70,138 @@ stmts:
 
 stmt:
   expr NEWLINE { Expr $1 }
-| classdecl { $1 }
-| fdecl { $1 }
 | RETURN expr NEWLINE { Return $2 }
 | if_stmt  { $1 }
 | loop { $1 }
 
 if_stmt:
-  IF expr COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, [], []) }
-| IF expr COLON NEWLINE INDENT stmts DEDENT ELSE COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, [], List.rev $12) }
-| IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE COLON NEWLINE INDENT stmts DEDENT { If($2, List.rev $6, List.rev $8, List.rev $13) }
-| IF expr COLON NEWLINE INDENT stmts DEDENT elif { If($2, List.rev $6, List.rev $8, []) }
+  IF expr COLON NEWLINE INDENT stmts DEDENT { If ($2, List.rev $6, [], []) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT ELSE COLON NEWLINE INDENT stmts DEDENT { If ($2, List.rev $6, [], List.rev $12) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT elif ELSE COLON NEWLINE INDENT stmts DEDENT { If ($2, List.rev $6, List.rev $8, List.rev $13) }
+| IF expr COLON NEWLINE INDENT stmts DEDENT elif { If ($2, List.rev $6, List.rev $8, []) }
 
 fdecl:
-  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { Func($7, $2, List.rev $4, List.rev $11) }
-| DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT { Func([], $2, List.rev $4, List.rev $9) }
-| DEF IDENTIFIER LPAREN RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { Func($6, $2, [], List.rev $10) }
-| DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT { Func([], $2, [], List.rev $8) }
-| DEF UNDERSCORE OBJ_OPERATOR LPAREN TYPE IDENTIFIER RPAREN RETURNS TYPE COLON NEWLINE INDENT stmts DEDENT { } /* TODO */
+  DEF IDENTIFIER LPAREN type_params RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $7; fname = $2; formals = List.rev $4; body = List.rev $11} }
+| DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = List.rev $4; body = List.rev $9} }
+| DEF IDENTIFIER LPAREN RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $6; fname = $2; formals = []; body = List.rev $10} }
+| DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = []; body = List.rev $8} }
+| DEF UNDERSCORE OBJ_OPERATOR LPAREN typ IDENTIFIER RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $9; fname = $3; formals = [($5, $6)]; body = List.rev $13} }
 
 elif:
   ELIF expr COLON NEWLINE INDENT stmts DEDENT { [($2, List.rev $6)] }
 | elif ELIF expr COLON NEWLINE INDENT stmts DEDENT { ($3, List.rev $7) :: $1 }
 
 loop:
-  LOOP expr WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop($2, $4, List.rev $8) }
-| LOOP WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop(NullExpr, $3, List.rev $7) }
+  LOOP expr WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop ($2, $4, List.rev $8) }
+| LOOP WHILE expr COLON NEWLINE INDENT stmts DEDENT { Loop (NullExpr, $3, List.rev $7) }
 
 type_params:  /* these are the method signature type */
-  TYPE IDENTIFIER { [($1, $2)] } /* $1 is the type, which is just a string. then we need to convert that to ast.ml typ object. $2 } */
-| type_params COMMA TYPE IDENTIFIER { ($3, $4) :: $1 }
+  typ IDENTIFIER { [($1, $2)] }
+| type_params COMMA typ IDENTIFIER { ($3, $4) :: $1 }
 
 params: /* these are the params used to invoke a function */
   expr { [$1] }
 | params COMMA expr { $3 :: $1 }
 
 classdecl:
-  CLASS TYPE COLON NEWLINE
+  CLASS CLASS_NAME COLON NEWLINE
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls NEWLINE {}
+    DEDENT optional_fdecls NEWLINE { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
 
 vdecls:
-  vdecl {}
-| vdecls NEWLINE vdecl {}
+  vdecl { [$1] }
+| vdecls NEWLINE vdecl { $3::$1 }
 
 vdecl:
-  TYPE IDENTIFIER {}
+  typ IDENTIFIER { ($1, $2) }
 
 assigns:
-  assign {}
-| assigns NEWLINE assign {}
+  assign { [$1] }
+| assigns NEWLINE assign { $3::$1 }
 
 assign:
-  TYPE IDENTIFIER EQ expr {}
-| IDENTIFIER EQ expr {}
-| object_variable_access EQ expr {}
+  typ IDENTIFIER EQ expr { RegularAssign ($1, $2, $4) }
+| object_variable_access EQ expr { ObjectVariableAssign ($1, $3) }
 
 assign_update:
-  IDENTIFIER PLUS_EQ expr {}
-| IDENTIFIER MINUS_EQ expr {}
-| IDENTIFIER TIMES_EQ expr {}
-| IDENTIFIER DIVIDE_EQ expr {}
-| object_variable_access PLUS_EQ expr {}
-| object_variable_access MINUS_EQ expr {}
-| object_variable_access TIMES_EQ expr {}
-| object_variable_access DIVIDE_EQ expr {}
+  IDENTIFIER EQ expr { RegularUpdate ($1, Eq, $3) }
+| IDENTIFIER PLUS_EQ expr { RegularUpdate ($1, PlusEq, $3) }
+| IDENTIFIER MINUS_EQ expr { RegularUpdate ($1, MinusEq, $3) }
+| IDENTIFIER TIMES_EQ expr { RegularUpdate ($1, TimesEq, $3) }
+| IDENTIFIER DIVIDE_EQ expr { RegularUpdate ($1, DivideEq, $3) }
+| object_variable_access PLUS_EQ expr { ObjectVariableUpdate ($1, PlusEq, $3) }
+| object_variable_access MINUS_EQ expr { ObjectVariableUpdate ($1, MinusEq, $3) }
+| object_variable_access TIMES_EQ expr { ObjectVariableUpdate ($1, TimesEq, $3) }
+| object_variable_access DIVIDE_EQ expr { ObjectVariableUpdate ($1, DivideEq, $3) }
 
 func_call:
-  IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { Call($1, $3, List.rev $5) }
-| SELF PERIOD IDENTIFIER LPAREN params RPAREN { Call("self", $3, List.rev $5) }
-| IDENTIFIER LPAREN params RPAREN { Call($1, List.rev $3) }
-| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { Call($1, $3, []) }
-| SELF PERIOD IDENTIFIER LPAREN RPAREN { Call("self", $3, []) }
-| IDENTIFIER LPAREN RPAREN { Call($1, []) }
+  IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ($1, $3, List.rev $5) }
+| SELF PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ("self", $3, List.rev $5) }
+| IDENTIFIER LPAREN params RPAREN { FuncCall ($1, List.rev $3) }
+| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ($1, $3, []) }
+| SELF PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ("self", $3, []) }
+| IDENTIFIER LPAREN RPAREN { FuncCall ($1, []) }
 
 object_instantiation:
-  TYPE LPAREN params RPAREN { ObjectInstantiation(TODO, List.rev $3) }
-| TYPE LPAREN RPAREN { ObjectInstantiation(TODO) }
+  CLASS_NAME LPAREN params RPAREN { ObjectInstantiation (Class $1, List.rev $3) }
+| CLASS_NAME LPAREN RPAREN { ObjectInstantiation (Class $1, []) }
 
 object_variable_access:
-  IDENTIFIER PERIOD IDENTIFIER { ObjectVariableAccess($1, $3) }
-| SELF PERIOD IDENTIFIER { ObjectVarialbeAccess("self", $3) }
+  IDENTIFIER PERIOD IDENTIFIER { ($1, $3) }
+| SELF PERIOD IDENTIFIER { ("self", $3) }
 
 array_access:
-  IDENTIFIER LBRACKET expr RBRACKET { ArrayAccess($1, $3)}
+  IDENTIFIER LBRACKET expr RBRACKET { ArrayAccess ($1, $3)}
 
 array_literal:
-  LBRACKET params RBRACKET { ArrayLiteral(List.rev $2) }
-| LBRACKET RBRACKET { ArrayLiteral([]) }
+  LBRACKET params RBRACKET { ArrayLiteral (List.rev $2) }
+| LBRACKET RBRACKET { ArrayLiteral ([]) }
+
+typ:
+  INT { Primitive Int }
+| LONG { Primitive Long }
+| FLOAT { Primitive Float }
+| CHAR { Primitive Char }
+| STRING { Primitive String }
+| BOOLEAN { Primitive Bool }
+| VOID { Primitive Void }
+| CLASS_NAME { Class $1 }
+| typ LBRACKET INT_LITERAL RBRACKET { Array ($1, $3) }
+| typ LBRACKET RBRACKET { Array ($1, -1) }
 
 expr:
-  INT_LITERAL { IntLiteral($1) }
-| LONG_LITERAL { LongLiteral($1) }
-| FLOAT_LITERAL { FloatLiteral($1) }
-| CHAR_LITERAL { CharLitera($1) }
-| STRING_LITERAL { StringLiteral($1) }
-| BOOLEAN_LITERAL { BoolLiteral($1) }
-| IDENTIFIER { Id($1) }
+  INT_LITERAL { IntLiteral $1 }
+| LONG_LITERAL { LongLiteral $1 }
+| FLOAT_LITERAL { FloatLiteral $1 }
+| CHAR_LITERAL { CharLiteral $1 }
+| STRING_LITERAL { StringLiteral $1 }
+| BOOLEAN_LITERAL { BoolLiteral $1 }
+| IDENTIFIER { Id $1 }
 | NULL { NullExpr }
-| func_call { $1 }
+| func_call { Call $1 }
 | object_instantiation { $1 }
-| object_variable_access { $1 }
+| object_variable_access { ObjectVariableAccess $1 }
 | array_access { $1 }
 | array_literal { $1 }
 | LPAREN expr RPAREN { Paren $2 }
-| expr PLUS expr { Binop($1, Plus, $3)}
-| expr MINUS expr { Binop($1, Subtract, $3) }
-| expr TIMES expr { Binop($1, Times, $3) }
-| expr DIVIDE expr { Binop($1, Divide, $3) }
-| expr MODULO expr { Binop($1, Modulo, $3) }
-| expr OBJ_OPERATOR expr { Binop($1, ObjOperator, $3) }
-| MINUS expr %prec UNARY_MINUS { Unop(Neg, $2) }
-| assign {}
-| assign_update {}
-| expr DOUBLE_EQ expr { Binop($1, DoubleEq, $3) }
-| expr NOT_EQ expr { Binop($1, NotEq, $3) }
-| expr GT expr { Binop($1, GT, $3) }
-| expr LT expr { Binop($1, LT, $3) }
-| expr GTE expr { Binop($1, GTE, $3) }
-| expr LTE expr { Binop($1, LTE, $3) }
-| NOT expr { Unop(Not, $2) }
-| expr OR expr { Binop($1, Or, $3) }
-| expr AND expr { Binop($1, And, $3) }
+| expr PLUS expr { Binop ($1, Plus, $3) }
+| expr MINUS expr { Binop ($1, Subtract, $3) }
+| expr TIMES expr { Binop ($1, Times, $3) }
+| expr DIVIDE expr { Binop ($1, Divide, $3) }
+| expr MODULO expr { Binop ($1, Modulo, $3) }
+| expr OBJ_OPERATOR expr { Binop ($1, ObjOperator, $3) }
+| MINUS expr %prec UNARY_MINUS { Unop (Neg, $2) }
+| assign { Assign $1 }
+| assign_update { Update $1 }
+| expr DOUBLE_EQ expr { Binop ($1, DoubleEq, $3) }
+| expr NOT_EQ expr { Binop ($1, NotEq, $3) }
+| expr GT expr { Binop ($1, BoGT, $3) }
+| expr LT expr { Binop ($1, BoLT, $3) }
+| expr GTE expr { Binop ($1, BoGTE, $3) }
+| expr LTE expr { Binop ($1, BoLTE, $3) }
+| NOT expr { Unop (Not, $2) }
+| expr OR expr { Binop ($1, BoOr, $3) }
+| expr AND expr { Binop ($1, BoAnd, $3) }
+
