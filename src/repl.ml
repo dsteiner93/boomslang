@@ -13,6 +13,6 @@
 
 let _ =
   let lexbuf = Lexing.from_channel stdin in
-  let _ = Parser.program Scanner.tokenize lexbuf in
+  let _ = Parser.program Scanner.read_next_token lexbuf in
   print_endline "Passed"
 
