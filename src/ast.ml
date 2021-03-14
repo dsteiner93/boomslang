@@ -2,9 +2,9 @@ type primitive = Int | Long | Float | Char | String | Bool | Void
 
 type binop = Plus | Subtract | Times | Divide | Modulo | ObjOperator | DoubleEq | NotEq | BoGT | BoLT | BoGTE | BoLTE | BoOr | BoAnd
 
-type uop = Not | Neg
+type unaryop = Not | Neg
 
-type update_op = Eq | PlusEq | MinusEq | TimesEq | DivideEq
+type updateop = Eq | PlusEq | MinusEq | TimesEq | DivideEq
 
 type typ = 
   Primitive of primitive
@@ -26,12 +26,12 @@ type expr =
 | NullExpr
 | Call of call
 | Paren of expr
-| ObjectInstantiation of typ * expr list
+| ObjectInstantiation of string * expr list
 | ObjectVariableAccess of object_variable_access
 | ArrayAccess of string * expr
 | ArrayLiteral of expr list
 | Binop of expr * binop * expr
-| Unop of  uop * expr
+| Unop of  unaryop * expr
 | Assign of assign
 | Update of update
 and call =
@@ -41,8 +41,8 @@ and assign =
   RegularAssign of typ * string * expr
 | ObjectVariableAssign of object_variable_access * expr
 and update =
-  RegularUpdate of string * update_op * expr
-| ObjectVariableUpdate of object_variable_access * update_op * expr
+  RegularUpdate of string * updateop * expr
+| ObjectVariableUpdate of object_variable_access * updateop * expr
 
 type stmt =
   Expr of expr

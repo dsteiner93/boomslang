@@ -145,8 +145,8 @@ func_call:
 | IDENTIFIER LPAREN RPAREN { FuncCall ($1, []) }
 
 object_instantiation:
-  CLASS_NAME LPAREN params RPAREN { ObjectInstantiation (Class $1, List.rev $3) }
-| CLASS_NAME LPAREN RPAREN { ObjectInstantiation (Class $1, []) }
+  CLASS_NAME LPAREN params RPAREN { ObjectInstantiation ($1, List.rev $3) }
+| CLASS_NAME LPAREN RPAREN { ObjectInstantiation ($1, []) }
 
 object_variable_access:
   IDENTIFIER PERIOD IDENTIFIER { ($1, $3) }
