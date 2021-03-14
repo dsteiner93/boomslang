@@ -4,3 +4,6 @@ src/ast.cmi
 src/parser.cmi
 src/parser.ml
 src/parser.mli
+src/a.out
+src/repl.out
+
