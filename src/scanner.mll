@@ -25,6 +25,15 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
 let strip_firstlast str =
   if String.length str <= 2 then ""
   else String.sub str 1 ((String.length str) - 2)
+
+let tab_count_stack = Stack.of_seq (List.to_seq [0])
+let token_queue = Queue.create ()
+
+let rec enqueue_dedents n = if n > 0 then (Queue.add DEDENT token_queue; (enqueue_dedents (n-1)))
+
+let rec enqueue_indents n = if n > 0 then (Queue.add INDENT token_queue; (enqueue_indents (n-1)))
+
+let count_tabs str = if String.contains str '\t' then String.length str - String.index str '\t' else 0
 }
 
 
@@ -35,7 +44,7 @@ let class_name = ['A'-'Z']['a'-'z' 'A'-'Z']*
 let int_literal = ['0'-'9']+
 
 rule tokenize = parse
-  [' ' '\t' '\r'] { tokenize lexbuf }
+  [' ' '\r'] { tokenize lexbuf }
 (* Mathematical operations *)
 | '+' { PLUS }
 | '-' { MINUS }
@@ -67,7 +76,6 @@ rule tokenize = parse
 | '.' { PERIOD }
 | ',' { COMMA }
 | '_' { UNDERSCORE }
-| ['\n']+ { NEWLINE }
 | "NULL" { NULL }
 (* Literal definitions *)
 | int_literal as lit { INT_LITERAL(int_of_string lit) }
@@ -84,7 +92,16 @@ rule tokenize = parse
    String literals are a " followed by any non newline or double quote
    followed by " *)
 | '"' ([^'"''\n'])* '"' as lit { STRING_LITERAL(strip_firstlast lit) }
-(* TODO syntactically meaningful whitespace - must keep track of INDENT *)
+(* Syntactically meaningful whitespace - tabs for indentation only *)
+| ['\n']+['\t']* as newlines_and_tabs {
+  let num_tabs = (count_tabs newlines_and_tabs) in
+  if (Stack.top tab_count_stack) == num_tabs then
+    NEWLINE
+  else if (Stack.top tab_count_stack) > num_tabs then
+    ((enqueue_dedents ((Stack.pop tab_count_stack) - num_tabs); Stack.push num_tabs tab_count_stack); NEWLINE)
+  else
+    ((enqueue_indents (num_tabs - (Stack.top tab_count_stack)); Stack.push num_tabs tab_count_stack); NEWLINE)
+}
 (* User defined types, i.e. class names *)
 | class_name as t { CLASS_NAME(t) }
 (* If we see a lowercase letter followed by any letters or digits,
@@ -108,3 +125,9 @@ and multi_comment = parse
 and single_comment = parse
   '\n' { tokenize lexbuf }
 | _ { single_comment lexbuf }
+
+{
+let read_next_token lexbuf =
+  if Queue.is_empty token_queue then tokenize lexbuf else Queue.take token_queue
+}
+

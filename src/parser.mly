@@ -60,10 +60,6 @@ program_without_eof:
 | program_without_eof NEWLINE { $1 }
 | /* nothing */ { { p_stmts = []; p_fdecls = []; p_classdecls = []; } }
 
-optional_fdecls:
-  optional_fdecls fdecl { $2::$1 }
-| /* nothing */ { [] }
-
 stmts:
   { [] }
 | stmts stmt { $2 :: $1 }
@@ -108,7 +104,26 @@ classdecl:
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls NEWLINE { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = []; methods = List.rev $6} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = []; methods = List.rev $13} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = []; methods = List.rev $13} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = List.rev $10; methods = List.rev $13} }
+
+optional_fdecls:
+  fdecls { $1 }
+| /* nothing */ { [] }
+
+fdecls:
+  fdecl { [$1] }
+| fdecls fdecl { $2::$1 }
 
 vdecls:
   vdecl { [$1] }

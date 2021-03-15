@@ -229,6 +229,224 @@ class TestLexerAndParser(unittest.TestCase):
     program = b'string foo = "foooooOOOoo !@$%^&*()_-+={}|[]:;/<,.>"\n'
     self.assertProgramPasses(program)
 
+  def test_complicated_program_1(self):
+    program = b"""
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+			println("hey")
+
+
+
+
+int x = 50
+"""
+    self.assertProgramPasses(program)
+
+  def test_complicated_program_2(self):
+    program = b"""
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+			println("hey")
+
+
+
+def myfunc2(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+			println("hey")
+
+
+
+
+int x = 50
+"""
+    self.assertProgramPasses(program)
+
+  def test_complicated_program_3(self):
+    program = b"""
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+			println("hey")
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_1(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean x = true
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_2(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean x = true
+
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_3(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean x = true
+
+
+	def mymethod():
+		self.x = false
+
+	def _++%%(MyObject other) returns MyObject:
+		return MyObject()
+
+
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_4(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean x = true
+
+
+	def mymethod():
+		self.x = false
+
+
+
+
+
+
+
+	def _++%%(MyObject other) returns MyObject:
+		return MyObject()
+	def mymethod2(int x):
+		return 5
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_5(self):
+    program = b"""
+class MyObject:
+	def _++%%(MyObject other) returns MyObject:
+		return MyObject()
+	def mymethod2(int x):
+		return 5
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_6(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_7(self):
+    program = b"""
+class MyObject:
+	required:
+		int x
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_8(self):
+    program = b"""
+class MyObject:
+	optional:
+		int x = 5
+"""
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -326,6 +544,54 @@ class TestLexerAndParser(unittest.TestCase):
 
   def test_invalid_string_literal_fails(self):
     program = u'string x = "fOOOO 😀 foo"\n'.encode('utf-16')
+    self.assertProgramFails(program)
+
+  def test_bad_indentation_fails_1(self):
+    program = b"""
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+				println("hey")
+
+
+
+
+int x = 50
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_indentation_fails_2(self):
+    program = b"""
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+		println("hey")
+
+
+
+
+int x = 50
+"""
     self.assertProgramFails(program)
 
 
