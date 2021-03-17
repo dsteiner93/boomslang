@@ -51,14 +51,14 @@ open Ast
 %%
 
 program:
-  program_without_eof EOF { { p_stmts = List.rev $1.p_stmts; p_fdecls = List.rev $1.p_fdecls; p_classdecls = List.rev $1.p_classdecls; } }
+  program_without_eof EOF { List.rev $1 }
 
 program_without_eof:
-  program_without_eof stmt { { p_stmts = $2::$1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls = $1.p_classdecls; } }
-| program_without_eof fdecl { { p_stmts = $1.p_stmts; p_fdecls = $2::$1.p_fdecls; p_classdecls = $1.p_classdecls; } }
-| program_without_eof classdecl { { p_stmts = $1.p_stmts; p_fdecls = $1.p_fdecls; p_classdecls = $2::$1.p_classdecls; } }
+  program_without_eof stmt { (Stmt $2)::$1 }
+| program_without_eof fdecl { (Fdecl $2)::$1 }
+| program_without_eof classdecl { (Classdecl $2)::$1 }
 | program_without_eof NEWLINE { $1 }
-| /* nothing */ { { p_stmts = []; p_fdecls = []; p_classdecls = []; } }
+| /* nothing */ { [] }
 
 stmts:
   { [] }
@@ -116,6 +116,18 @@ classdecl:
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = List.rev $10; methods = List.rev $13} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = []; methods = List.rev $20} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = List.rev $17; methods = List.rev $20} }
+| CLASS CLASS_NAME COLON NEWLINE
+    INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = List.rev $17; methods = List.rev $20} }
 
 optional_fdecls:
   fdecls { $1 }
@@ -158,6 +170,7 @@ func_call:
 | IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ($1, $3, []) }
 | SELF PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ("self", $3, []) }
 | IDENTIFIER LPAREN RPAREN { FuncCall ($1, []) }
+| IDENTIFIER OBJ_OPERATOR expr { MethodCall ($1, "_" ^ $2, [$3]) }
 
 object_instantiation:
   CLASS_NAME LPAREN params RPAREN { ObjectInstantiation ($1, List.rev $3) }
@@ -206,7 +219,6 @@ expr:
 | expr TIMES expr { Binop ($1, Times, $3) }
 | expr DIVIDE expr { Binop ($1, Divide, $3) }
 | expr MODULO expr { Binop ($1, Modulo, $3) }
-| expr OBJ_OPERATOR expr { Binop ($1, ObjOperator, $3) }
 | MINUS expr %prec UNARY_MINUS { Unop (Neg, $2) }
 | assign { Assign $1 }
 | assign_update { Update $1 }

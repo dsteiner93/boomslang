@@ -447,6 +447,52 @@ class MyObject:
 """
     self.assertProgramPasses(program)
 
+  def test_class_declaration_9(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+	required:
+		int y
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_10(self):
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+	optional:
+		int y = 5
+"""
+    self.assertProgramPasses(program)
+
+  def test_class_declaration_11(self):
+    program = b"""
+class MyObjectTwo:
+	required:
+		string x
+
+
+	optional:
+		string z = "foo"
+"""
+    self.assertProgramPasses(program)
+
+  def test_loop_1(self):
+    program = b"""
+loop x+1 while x<100:
+	print("hey")
+"""
+    self.assertProgramPasses(program)
+
+  def test_loop_2(self):
+    program = b"""
+loop while x<100:
+	print("hey")
+"""
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -591,6 +637,13 @@ def myfunc(int x, MyObject foo) returns string:
 
 
 int x = 50
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_loop_fails(self):
+    program = b"""
+loop x+2 while:
+	2+2
 """
     self.assertProgramFails(program)
 
