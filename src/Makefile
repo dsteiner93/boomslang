@@ -1,55 +1,20 @@
-all : repl.out
+# "make all" builds the executable
 
-##############################
-#
-# Compile the project
-#
+.PHONY : all
+all : pythonpp.native
 
-# "ocamlbuild repl.native" will also build the REPL
+# "make pythonpp.native" compiles the compiler
 
-repl : parser.cmo scanner.cmo ast.cmo repl.cmo
-	ocamlc -w +a -o repl $^
+pythonpp.native :
+	opam config exec -- \
+	ocamlbuild -use-ocamlfind pythonpp.native
 
-%.cmo : %.ml
-	ocamlc -w +a -c $<
-
-%.cmi : %.mli
-	ocamlc -w +a -c $<
-
-%.cmi : %.ml
-	ocamlc -w +a -c $<
-
-scanner.ml : scanner.mll
-	ocamllex $^
-
-parser.ml parser.mli : parser.mly
-	ocamlyacc $^
-
-repl.out : repl repl.tb
-	./repl < repl.tb > repl.out
-
-# Depedencies from ocamldep
-repl.cmo : scanner.cmo parser.cmi ast.cmi
-repl.cmx : scanner.cmx parser.cmx ast.cmi
-parser.cmo : ast.cmi parser.cmi
-parser.cmx : ast.cmi parser.cmi
-scanner.cmo : parser.cmi
-scanner.cmx : parser.cmx
-
-
-##############################
-
-TARFILES = README Makefile \
-	scanner.mll ast.ml parser.mly repl.ml repl.tb
-
-pythonplusplus.tar.gz : $(TARFILES)
-	cd .. && tar zcf project/pythonplusplus.tar.gz $(TARFILES:%=hw1/%)
+# "make clean" removes all generated files
 
 .PHONY : clean
 clean :
+	ocamlbuild -clean
+	rm -rf ocamlllvm *.diff
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
         repl.out repl a.out __pycache__
-
-test :
-	python3 -m unittest run_tests
