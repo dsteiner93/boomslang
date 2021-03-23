@@ -26,7 +26,9 @@ let strip_firstlast str =
   if String.length str <= 2 then ""
   else String.sub str 1 ((String.length str) - 2)
 
-let tab_count_stack = Stack.of_seq (List.to_seq [0])
+(* In ocaml 4.08+ you could write let tab_count_stack = Stack.of_seq (List.to_seq [0]) *)
+let tab_count_stack = Stack.create ()
+let add_zero_to_stack = (Stack.push 0 tab_count_stack); ()
 let token_queue = Queue.create ()
 
 let rec enqueue_dedents n = if n > 0 then (Queue.add DEDENT token_queue; (enqueue_dedents (n-1)))
