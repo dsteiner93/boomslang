@@ -18,3 +18,4 @@ clean :
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
         repl.out repl a.out __pycache__
+

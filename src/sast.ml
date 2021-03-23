@@ -5,6 +5,7 @@ open Ast
 type sexpr = typ * sx
 and sx = 
   SStringLiteral of string
+| SCharLiteral of char
 | Scall of scall
 and scall = 
   SFuncCall of string * sexpr list (* my_func(1, 2, 3) *)

@@ -20,6 +20,9 @@
      
      let lexbuf = Lexing.from_channel !channel in
      let ast = Parser.program Scanner.tokenize lexbuf in  
+     let sast = Semant.check in
+     let m = Codegen.translate sast in
+     (*
      match !action with
        Ast -> ()
      | _ -> let sast = ast in
@@ -28,6 +31,7 @@
        | Sast    -> print_string ""
        | LLVM_IR -> print_string ""
        | Compile -> let m = Codegen.translate sast in
-     (* Llvm_analysis.assert_valid_module m;
-     print_string (Llvm.string_of_llmodule m) *)
+       *)
+     Llvm_analysis.assert_valid_module m;
+     print_string (Llvm.string_of_llmodule m)
    

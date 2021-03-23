@@ -9,7 +9,7 @@
    they got tokenized. If you enter a valid expression, the
    program should end with "Passed" when you hit ctrl-D. If you
    enter an invalid program, it will give you a parse error.
- *)
+*)
 open Ast
 
 let _ =
