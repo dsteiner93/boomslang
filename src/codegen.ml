@@ -27,22 +27,47 @@ let translate spunits =
   let the_module = L.create_module context "Pythonpp" in
 
   (* Get types from the context *)
-  let i32_t      = L.i32_type          context
-  and void_t     = L.void_type         context in
+  let int_t      = L.i32_type           context
+  and void_t     = L.void_type          context in
 
-  (* Return the LLVM type for a MicroC type *)
+  (* Return the LLVM type for a python++ type *)
   let ltype_of_typ = function
-     A.Int   -> i32_t
-  |  A.Void   -> void_t
+     A.Int    -> int_t
   |  _        -> void_t
   in
 
-  let printf_t : L.lltype = 
-      L.var_arg_function_type i32_t [| i32_t |] in
-  let println_func : L.llvalue = 
-      L.declare_function "println" printf_t the_module in
+  let println_t : L.lltype =
+      L.var_arg_function_type void_t [| int_t |] in
+  let println_func : L.llvalue =
+      L.declare_function "println" println_t the_module in
+  
+  let main_t : L.lltype = 
+      L.var_arg_function_type int_t [| |] in
+  let main_func : L.llvalue = 
+    L.define_function "main" main_t the_module in
 
-  (* Fill in the body of the given function *)
+  let builder = L.builder_at_end context (L.entry_block main_func) in
+
+  let main_return : L.llvalue =
+    L.build_ret (L.const_int int_t 0) builder in
+  (*
+  let main_entry_block = L.entry_block main_func in
+  let builder = L.builder_at_end context main_entry_block in
+  
+  
+  let builder = L.builder_at_end context (L.entry_block the_function) in
+  
+  let main_return : L.llvalue =
+    L.build_ret_void the_module *)
+(* 
+  let builder = L.builder_at_end context (L.entry_block "main") in
+  let _ = L.build_call println_func [| 42 |] "println" builder in
+*)
+  
+  the_module
+
+(*  
+(* Fill in the body of the given function *)
   let build_expr_body fdecl =
     (* let (the_function, _) = StringMap.find fdecl.sfname function_decls in *)
     
@@ -97,3 +122,4 @@ in
 
   List.iter build_expr_body spunits;
   the_module
+*)
