@@ -36,9 +36,26 @@ let translate spunits =
   |  _        -> void_t
   in
 
+  (* define the println function, this prints ints for now *) 
   let println_t : L.lltype =
       L.var_arg_function_type void_t [| int_t |] in
   let println_func : L.llvalue =
       L.declare_function "println" println_t the_module in
+
+  (* LLVM requires a 'main' function as an entry point *) 
+  let main_t : L.lltype = 
+      L.var_arg_function_type int_t [| |] in
+  let main_func : L.llvalue = 
+    L.define_function "main" main_t the_module in
+
+  let builder = L.builder_at_end context (L.entry_block main_func) in
+
+  (* hardcode to print int = 42 *) 
+  let _ : L.llvalue =
+    L.build_call println_func [| (L.const_int int_t 42) |] "" builder in
+
+  (* add the return at the end of main *) 
+  let main_return : L.llvalue =
+    L.build_ret (L.const_int int_t 0) builder in
   
   the_module

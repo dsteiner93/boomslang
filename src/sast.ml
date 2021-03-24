@@ -3,15 +3,19 @@
 open Ast
 
 type sexpr = typ * sx
+
 and sx = 
  SLiteral of int
-| SCall of string * sexpr list (* my_func(1, 2, 3) *)
+| SCall of scall
+
+and call =
+ FuncCall of string * sx list 
 
 type sstmt =
-  SExpr of sexpr
+ SExpr of sexpr
 
 type sp_unit =
-  SStmt of sstmt
+ SStmt of sstmt
 
 type sprogram = sp_unit list
 (* or maybe just type sprogram = sexpr *)
