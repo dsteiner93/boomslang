@@ -1,38 +1,45 @@
-(* Semantic checking for the MicroC compiler *)
+(* Semantic checking for the Python++ compiler *)
 
 open Ast
 open Sast
 
-module StringMap = Map.Make(String)
+module StringMap = Map.Make(String);;
 
 (* Semantic checking of the AST. Returns an SAST if successful,
-   throws an exception if something is wrong.
+   throws an exception if something is wrong. *)
 
-   Check each global variable, then check each function *)
+(* Add built-in functions *)
+let check program =
 
-let check spunits =
-   [(Void, ("println", [(2)]))]
- 
- (*
-  (**** Check functions ****)
+let built_in_funcs =
+  let add map fdecl = StringMap.add fdecl.fname fdecl map in
+  List.fold_left add StringMap.empty [{rtype = Primitive Void; fname = "println"; formals = [(Primitive String, "unused")]; body = []}]
+in
 
-  (* Collect function declarations for built-in functions: no bodies *)
-  let built_in_decls = 
-    let add_bind map (name, ty) = StringMap.add name {
-      typ = Void;
-      fname = name; 
-      formals = [(ty, "x")];
-      locals = []; body = [] } map
-    in List.fold_left add_bind StringMap.empty [ ("print", Int);
-			                         ("printb", Bool);
-			                         ("printf", Float);
-			                         ("printbig", Int) ]
-    in (* body of check_function *)
-    { styp = Void;
-      sfname = print;
-      sformals = string;
-      slocals  = "Hello World";
-      sbody = 
-    }
-  in (List.map check)_function functions)
-*)
+let rec check_fcall fname actuals =
+  if StringMap.mem fname built_in_funcs then SFuncCall(fname, (List.map check_expr actuals)) else raise (Failure("Unimplemented"))
+and
+
+check_call = function
+  FuncCall(fname, exprs) -> SCall (check_fcall fname exprs)
+| _ -> raise (Failure("Unimplemented"))
+and
+
+check_expr = function
+  StringLiteral(str) -> (Primitive(String), SStringLiteral(str))
+| Call(call) -> (Primitive(Void), check_call call)
+| _ -> raise (Failure("Unimplemented"))
+and
+
+check_stmt = function
+  Expr(expr) -> SExpr (check_expr expr)
+| _ -> raise (Failure("Unimplemented"))
+and
+
+check_p_unit = function
+  Stmt(stmt) -> SStmt (check_stmt stmt)
+| _ -> raise (Failure("Unimplemented"))
+in
+
+List.map check_p_unit program
+

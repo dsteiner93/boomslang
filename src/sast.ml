@@ -5,19 +5,17 @@ open Ast
 type sexpr = typ * sx
 
 and sx = 
- SLiteral of int
+  SIntLiteral of int
+| SStringLiteral of string
 | SCall of scall
-
-and call =
- FuncCall of string * sx list 
+and scall =
+  SFuncCall of string * sexpr list
 
 type sstmt =
- SExpr of sexpr
+  SExpr of sexpr
 
 type sp_unit =
- SStmt of sstmt
+  SStmt of sstmt
 
 type sprogram = sp_unit list
-(* or maybe just type sprogram = sexpr *)
 
-(* [ (Void, ("println", [(string, "Hello World")]))] *)

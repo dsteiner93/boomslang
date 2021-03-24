@@ -14,24 +14,13 @@
        ("-c", Arg.Unit (set_action Compile),
          "Check and print the generated LLVM IR (default)");
      ] in  
-     let usage_msg = "usage: ./microc.native [-a|-s|-l|-c] [file.mc]" in
+     let usage_msg = "usage: ./pythonpp.native [-a|-s|-l|-c] [file.mc]" in
      let channel = ref stdin in
      Arg.parse speclist (fun filename -> channel := open_in filename) usage_msg;
      
      let lexbuf = Lexing.from_channel !channel in
-     let ast = Parser.program Scanner.tokenize lexbuf in  
-     let sast = Semant.check in
+     let ast = Parser.program Scanner.read_next_token lexbuf in
+     let sast = Semant.check ast in
      let m = Codegen.translate sast in
-     (*
-     match !action with
-       Ast -> ()
-     | _ -> let sast = ast in
-       match !action with
-         Ast     -> ()
-       | Sast    -> print_string ""
-       | LLVM_IR -> print_string ""
-       | Compile -> let m = Codegen.translate sast in
-       *)
      Llvm_analysis.assert_valid_module m;
      print_string (Llvm.string_of_llmodule m)
-   

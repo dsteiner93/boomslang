@@ -15,4 +15,4 @@ open Ast
 let _ =
   let lexbuf = Lexing.from_channel stdin in
   let ast = Parser.program Scanner.read_next_token lexbuf in
-  print_endline ("Passed\n" ^ (graphviz_string_of_program ast) )
+  print_endline ("Passed\n" ^ (graphviz_string_of_program ast))

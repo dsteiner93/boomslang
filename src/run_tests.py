@@ -25,7 +25,7 @@ class TestLexerAndParser(unittest.TestCase):
     process.terminate()
 
   def make(self):
-    process = subprocess.Popen(["make"],
+    process = subprocess.Popen(["make", "repl"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
