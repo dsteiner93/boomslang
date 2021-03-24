@@ -48,6 +48,9 @@ let translate spunits =
 
   let builder = L.builder_at_end context (L.entry_block main_func) in
 
+  let _ : L.llvalue =
+    L.build_call println_func [| (L.const_int int_t 42) |] "" builder in
+
   let main_return : L.llvalue =
     L.build_ret (L.const_int int_t 0) builder in
   (*
