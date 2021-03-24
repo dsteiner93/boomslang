@@ -27,18 +27,18 @@ let translate spunits =
   let the_module = L.create_module context "Pythonpp" in
 
   (* Get types from the context *)
-  let char_t     = L.i8_type           context
+  let i32_t      = L.i32_type          context
   and void_t     = L.void_type         context in
 
   (* Return the LLVM type for a MicroC type *)
   let ltype_of_typ = function
-     A.Char   -> char_t
+     A.Int   -> i32_t
   |  A.Void   -> void_t
   |  _        -> void_t
   in
 
   let printf_t : L.lltype = 
-      L.var_arg_function_type char_t [| char_t |] in
+      L.var_arg_function_type i32_t [| i32_t |] in
   let println_func : L.llvalue = 
       L.declare_function "println" printf_t the_module in
 
@@ -46,8 +46,12 @@ let translate spunits =
   let build_expr_body fdecl =
     (* let (the_function, _) = StringMap.find fdecl.sfname function_decls in *)
     
-    let ftype = L.function_type (ltype_of_typ fdecl.styp) in
-    let the_function = (L.define_function "println" ftype the_module, fdecl) in
+    (* TODO: Char is hard coded for now, don't hardcode this later *) 
+    let name = "println"
+    and formal_types = [| i32_t |] in
+      let ftype = L.function_type void_t formal_types in
+    (* let ftype = L.function_type (ltype_of_typ A.Void) char_t in *)
+    let the_function = L.define_function "println" void_t the_module in
 
     (* creates an instruction builder positioned at the end of the basic block context *)
     let builder = L.builder_at_end context 
@@ -56,22 +60,38 @@ let translate spunits =
 
     (* creates a series of instructions that adds a global 
     string pointer at the position specified by the instruction builder "builder".*)
-    let char_format_str = L.build_global_stringptr "%c\n" "fmt" builder in
+    let int_format_str = L.build_global_stringptr "%d\n" "fmt" builder in
 
     (* Construct code for an expression; return its value *)
     let rec expr builder ((_, e) : sexpr) = match e with
-    SCharLiteral c -> L.const_string char_t c
+    SLiteral i  -> L.const_int i32_t i
       | SCall ("println", [e]) -> 
+        L.build_call println_func [| int_format_str ; (expr builder e) |] 
+                                    "println" builder
+      | _ -> L.const_int i32_t 0
 
     (* Construct code for an expression; return its value *)
     (* creates a %name = call %fn(args...) 
     instruction at the position specified by the instruction builder b. 
     i.e. %println = call println_func(i8 104) *)
-    L.build_call println_func [| char_format_str ; (expr builder e) |] "println" builder
     in
+  (* LLVM insists each basic block end with exactly one "terminator" 
+       instruction that transfers control.  This function runs "instr builder"
+       if the current block does not already have a terminator.  Used,
+       e.g., to handle the "fall off the end of the function" case. *)
+  let add_terminal builder instr =
+    match L.block_terminator (L.insertion_block builder) with
+Some _ -> ()
+    | None -> ignore (instr builder)
+  
+  in
+
+  (* Build the code for each statement in the function *)
+  let builder = expr builder (SBlock fdecl) in
 
   (* Add a return if the last block falls off the end *)
-  add_terminal builder (match fdecl.styp with
+  
+  add_terminal builder (match fdecl with
     A.Void -> L.build_ret_void)
 in
 

@@ -11,7 +11,7 @@ module StringMap = Map.Make(String)
    Check each global variable, then check each function *)
 
 let check spunits =
-   [(Void, ("println", [(Char, 'h')]))]
+   [(Void, ("println", [(2)]))]
  
  (*
   (**** Check functions ****)
