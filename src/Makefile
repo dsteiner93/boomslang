@@ -1,13 +1,13 @@
 # "make all" builds the executable
 
 .PHONY : all
-all : pythonpp.native
+all : boomslang.native
 
-# "make pythonpp.native" compiles the compiler
+# "make boomslang.native" compiles the compiler
 
-pythonpp.native :
+boomslang.native :
 	opam config exec -- \
-	ocamlbuild -use-ocamlfind pythonpp.native
+	ocamlbuild -use-ocamlfind boomslang.native
 
 repl : parser.cmo scanner.cmo ast.cmo repl.cmo
 	ocamlc -w +a -o repl $^
@@ -27,9 +27,6 @@ scanner.ml : scanner.mll
 parser.ml parser.mli : parser.mly
 	ocamlyacc $^
 
-repl.out : repl repl.tb
-	./repl < repl.tb > repl.out
-
 # Depedencies from ocamldep
 repl.cmo : scanner.cmo parser.cmi ast.cmi
 repl.cmx : scanner.cmx parser.cmx ast.cmi
@@ -42,19 +39,20 @@ scanner.cmx : parser.cmx
 
 .PHONY : clean
 clean :
-	sudo ocamlbuild -clean
-	sudo rm -rf ocamlllvm *.diff
-	sudo rm -rf \
+	ocamlbuild -clean
+	rm -rf ocamlllvm *.diff
+	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
-        repl.out repl a.out __pycache__ _build pythonpp.native \
+        repl.out repl a.out __pycache__ _build boomslang.native \
 	*.ll *.exe *.s
 
 TARFILES = README.md Makefile \
 	scanner.mll parser.mly ast.ml sast.ml semant.ml \
-	codegen.ml pythonpp.ml repl.ml repl.tb run_tests.py _tags
+	codegen.ml boomslang.ml repl.ml repl.tb run_tests.py \
+        _tags boom
 
 zip :
-	zip pythonpp $(TARFILES)
+	zip boomslang $(TARFILES)
 
 test :
 	python3 -m unittest run_tests

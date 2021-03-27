@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# Usage:
+# Running "./boom helloworld.boom" will compile the source to an exe.
+# Running "./boom -r helloworld.boom" will compile and automatically run the exe.
+input_file=$1
+should_execute=false
+if [ "$1" = "-r" ];
+then
+  input_file=$2
+  should_execute=true
+fi
+
+without_extension=$(echo "$input_file" | cut -f 1 -d '.')
+ll=".ll"
+s=".s"
+exe=".exe"
+ll_file="$without_extension$ll"
+s_file="$without_extension$s"
+exe_file="$without_extension$exe"
+
+make clean
+make
+./boomslang.native $input_file > $ll_file
+llc -relocation-model=pic $ll_file > $s_file
+cc -o $exe_file $s_file
+
+if [ "$should_execute" = true ];
+then
+./$exe_file
+fi

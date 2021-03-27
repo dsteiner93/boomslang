@@ -493,12 +493,16 @@ loop while x<100:
 """
     self.assertProgramPasses(program)
 
+  def test_valid_statement_without_newline_succeeds_1(self):
+    program = b"2 + 3 * 5 / 4"
+    self.assertProgramPasses(program)
+
+  def test_valid_statement_without_newline_succeeds_2(self):
+    program = b'println("hello world")'
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
-    self.assertProgramFails(program)
-
-  def test_valid_statement_without_newline_fails(self):
-    program = b"2 + 3 * 5 / 4"
     self.assertProgramFails(program)
 
   def test_invalid_assignment_fails_1(self):

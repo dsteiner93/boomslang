@@ -1,4 +1,4 @@
-(* Semantic checking for the Python++ compiler *)
+(* Semantic checking for the Boomslang compiler *)
 
 open Ast
 open Sast

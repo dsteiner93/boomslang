@@ -1,4 +1,4 @@
-(* Scanner for Python++ Language *)
+(* Scanner for the Boomslang Language *)
 
 {
 
@@ -39,7 +39,7 @@ let count_tabs str = if String.contains str '\t' then String.length str - String
 }
 
 
-(* Class names in Python++ must start with a capital letter,
+(* Class names in Boomslang must start with a capital letter,
    to distinguish them from identifiers, which must begin
    with a lowercase letter *)
 let class_name = ['A'-'Z']['a'-'z' 'A'-'Z']*
@@ -90,7 +90,7 @@ rule tokenize = parse
 (* Char literals are single quotes followed by any single character
    followed by a single quote *)
 | '\'' [' '-'~'] '\'' as lit { CHAR_LITERAL( (strip_firstlast lit).[0] ) }
-(* String literals in Python++ cannot contain double quotes or newlines.
+(* String literals in Boomslang cannot contain double quotes or newlines.
    String literals are a " followed by any non newline or double quote
    followed by " *)
 | '"' ([^'"''\n'])* '"' as lit { STRING_LITERAL(strip_firstlast lit) }
@@ -116,7 +116,12 @@ rule tokenize = parse
       IDENTIFIER(possible_id)
   }
 | ['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<']+ as lit { OBJ_OPERATOR(lit) }
-| eof { EOF }
+(* Automatically add a NEWLINE to end of all files.
+   All statements in Boomslang must end in a NEWLINE, such that
+   ordinarily all valid programs must have a blank line at the end.
+   But since this is easy to forget, we automatically add a blank line
+   here in case the user forgets. *)
+| eof { (Queue.add EOF token_queue); NEWLINE }
 | _ as char { raise (Failure("Illegal character: " ^ Char.escaped char)) }
 
 

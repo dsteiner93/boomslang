@@ -24,7 +24,7 @@ let translate sp_units =
   
   (* Create the LLVM compilation module into which
      we will generate code *)
-  let the_module = L.create_module context "Pythonpp" in
+  let the_module = L.create_module context "Boomslang" in
 
   (* Get types from the context *)
   let i8_t       = L.i8_type            context
@@ -33,7 +33,7 @@ let translate sp_units =
   and str_t      = L.pointer_type (L.i8_type context)
   in
 
-  (* Return the LLVM type for a python++ type *)
+  (* Return the LLVM type for a Boomslang type *)
   let ltype_of_typ = function
      A.Int    -> i32_t
   |  _        -> void_t
