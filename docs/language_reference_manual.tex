@@ -25,7 +25,7 @@
 
 \renewcommand{\arraystretch}{1.5}
 
-\title{Python++ Language Reference Manual}
+\title{Boomslang Language Reference Manual}
 \author{
 Nathan Cuevas\\
 \texttt{njc2150} 
@@ -45,23 +45,25 @@ David Steiner \\
 \tableofcontents
 
 \section{Introduction}
-Python++ is a general-purpose imperative programming language inspired by Python that aims to create a language as easy to use as Python, but with the added type safety of Java. The language is strongly and statically typed, has no type inferencing, and supports object-oriented programming without requiring that all functions be part of objects.
+Boomslang is a general-purpose imperative programming language inspired by Python that aims to create a language as easy to use as Python, but with the added type safety of Java. The language is strongly and statically typed, has no type inferencing, and supports object-oriented programming without requiring that all functions be part of objects.
 
-Python++ uses syntactically significant whitespace as opposed to curly braces and semicolons. In addition to adding static typing to a Python-style syntax, Python++ aims to add quality of life features such as automatic constructor generation for data classes, a new syntax for loops, and a better operator overloading syntax. Python++ does not offer any garbage collection nor does it allow for pointer arithmetic.
+Boomslang uses syntactically significant whitespace as opposed to curly braces and semicolons. In addition to adding static typing to a Python-style syntax, Boomslang aims to add quality of life features such as automatic constructor generation for data classes, a new syntax for loops, and a better operator overloading syntax. Boomslang does not offer any garbage collection nor does it allow for pointer arithmetic.
 
 \section{Lexical Conventions}
-Python++ has the following kinds of tokens: keywords, type names, identifiers, operators, literals, comments, punctuation, and syntactically significant whitespace. Python++ uses the ASCII character set and is case-sensitive.
+Boomslang has the following kinds of tokens: keywords, type names, identifiers, operators, literals, comments, punctuation, and syntactically significant whitespace. Boomslang uses the ASCII character set and is case-sensitive.
 
 \subsection{Keywords}
-Python++ treats the following keywords as reserved and will always return a special token matching the name rather than treating it as any other type of token. The reserved keywords are:
-\texttt{not or and loop while if elif else def class return returns self required optional static NULL}
+Boomslang treats the following keywords as reserved and will always return a special token matching the name rather than treating it as any other type of token. The reserved keywords are:
+\texttt{not or and loop while if elif else def class return returns self required optional static NULL int long float boolean char string void true false}
+
+The following are keywords in Python but not in Boomslang: \texttt{except lambda with as finally nonlocal assert None yield break for from continue global pass raise del import in is try True False}
 
 \subsection{Type names}
-Python++ is a statically typed language. A type is either a primitive type, which means it matches one of the below types, a class name, or it is an array type.
+Boomslang is a statically typed language. A type is either a primitive type, which means it matches one of the below types, a class name, or it is an array type.
 
 \subsubsection{Primitive type tokens}
 \label{sec:primitivetypetokens}
-The primitive datatype tokens are: \texttt{int, long, float, boolean, char, string, void}
+The primitive datatype tokens are: \texttt{int long float boolean char string void}
 
 \subsubsection{Class names}
 Class names must start with a capital letter, followed by one or more letters of any case. Class names are encouraged to take the UpperCamelCase form but are not required to by the compiler. Class names cannot contain anything other than letters. Class names are identified by the regular expression \texttt{['A'-'Z']['a'-'z' 'A'-'Z']*}
@@ -70,20 +72,20 @@ Class names must start with a capital letter, followed by one or more letters of
 Array types consist of a \hyperref[sec:primitivetypetokens]{primitive type token} followed by a [, followed by an \hyperref[sec:intliterals]{integer literal}, followed by a closing ].
 
 \subsection{Identifiers}
-Identifiers are case-sensitive. They consist of a lowercase letter followed by one or more lowercase letters, uppercase letters, numbers, or underscores in any order. Keywords cannot be used as identifiers, so if a keyword is seen it will always be tokenized as the keyword above and not the identifier. Identifiers are identified by the regular expression \texttt{['a'-'z']['a'-'z' 'A'-'Z' '0'-'9']*}
+Identifiers are case-sensitive. They consist of a lowercase letter followed by one or more lowercase letters, uppercase letters, numbers, or underscores in any order. Whereas class names always begin with an uppercase letter, identifiers always begin with a lowercase letter. Class names and identifiers are separate tokens. Keywords cannot be used as identifiers, so if a keyword is seen it will always be tokenized as the keyword above and not the identifier. Identifiers are identified by the regular expression \texttt{['a'-'z']['a'-'z' 'A'-'Z' '0'-'9' '\textunderscore']*}
 
 \subsection{Operators}
-Python++ includes the following tokens for operators: \texttt{+ - * / \% = += -= *= /= == != } \texttt{>} \texttt{<} \texttt{>=} \texttt{<=}
+Boomslang includes the following tokens for operators: \texttt{+ - * / \% = += -= *= /= == != } \texttt{>} \texttt{<} \texttt{>=} \texttt{<=}
 
 See \hyperref[sec:expr-mathematical-operators]{mathematical operators} and \hyperref[sec:expr-boolean-operators]{boolean operators} below for the semantic meaning of each operator.
 
 \subsubsection{Object operators}
-Python++ allows for users to define custom infix operators as syntactic sugar for classes. See \hyperref[sec:object-operators]{this} section for a complete code example. An object operator is defined to be one or more special characters. This is the precise regex: \texttt{['+' '-' '\%' '\&' '\$' '@' '!' '\#' '\^{}' '*' '/' '\~{}' '?' '}\texttt{>}\texttt{' '}\texttt{<}\texttt{']+}
+Boomslang allows for users to define custom infix operators as syntactic sugar for classes. See \hyperref[sec:object-operators]{this} section for a complete code example. An object operator is defined to be one or more special characters. This is the precise regex: \texttt{['+' '-' '\%' '\&' '\$' '@' '!' '\#' '\^{}' '*' '/' '\~{}' '?' '}\texttt{>}\texttt{' '}\texttt{<}\texttt{']+}
 
 Note that if something matches both an object operator and a primitive operator, then the primitive operator token above will be emitted by the scanner/lexer.
 
 \subsection{Literals}
-Python++ supports integer literals, floating point literals, boolean literals, character literals, and string literals.
+Boomslang supports integer literals, floating point literals, boolean literals, character literals, and string literals.
 
 \subsubsection{Integer literals}
 \label{sec:intliterals}
@@ -103,15 +105,15 @@ Boolean literals are either the string ``true'' or the string ''false''. These a
 Character literals consist of a single quote, followed by a single character, followed by a single quote. The exact regex to match character literals is \texttt{`.'} 
 
 \subsubsection{String literals}
-String literals consist of a double quote, followed by any character other than a double quote or newline, followed by a double quote. String literals \textbf{cannot} contain newlines or double quote characters in Python++.
+String literals consist of a double quote, followed by any character other than a double quote or newline, followed by a double quote. String literals \textbf{cannot} contain newlines or double quote characters in Boomslang.
 
 \subsection{Comments}
-Python++ supports both single-line and multi-line comments. Single-line comments start with a \texttt{\#} character and indicate that everything after the \texttt{\#} on that line is a comment and can be discarded.
+Boomslang supports both single-line and multi-line comments. Single-line comments start with a \texttt{\#} character and indicate that everything after the \texttt{\#} on that line is a comment and can be discarded.
 
-Alternatively, a comment can be started using \texttt{/\#} and closed using \texttt{\#/}. Comments starting with \texttt{/\#} are allowed to span multiple lines.
+Alternatively, a comment can be started using \texttt{/\#} and closed using \texttt{\#/}. Comments starting with \texttt{/\#} are allowed to span multiple lines. The language uses \texttt{/\#} and \texttt{\#/} rather than \texttt{/*} and \texttt{*/} (C/Java style) or \texttt{"""} (Python style) to be more consistent with the single-line comment character. Since \texttt{\#} is used for single-line comments, we view \texttt{/\#} and \texttt{\#/} as more consistent aesthetically than what is currently used in C, Java, or Python.
 
 \subsection{Punctuation}
-Python++ uses the following characters for punctuation: \texttt{( ) [ ] : . , \textunderscore} \newline
+Boomslang uses the following characters for punctuation: \texttt{( ) [ ] : . , \textunderscore} \newline
 
 \begin{itemize}
 \item Left and right parentheses can be used to group expressions and are also used to define and call functions.
@@ -128,7 +130,7 @@ Python++ uses the following characters for punctuation: \texttt{( ) [ ] : . , \t
 \end{itemize}
 
 \subsection{Syntactically significant whitespace}
-Python++ uses syntactically significant whitespace rather than curly braces or semi-colons. Python++ differs from Python in that spaces are not syntactically significant and only tab characters can be used.
+Boomslang uses syntactically significant whitespace rather than curly braces or semi-colons. Boomslang differs from Python in that spaces are not syntactically significant and only tab characters can be used.
 
 The \texttt{NEWLINE} character is used to indicate the end of each \hyperref[sec:stmt]{statement}. One \texttt{INDENT} token is used every time a line has increased indentation level compared to the previous indentation level. A \texttt{DEDENT} token is released for each corresponding decrease in the indentation level. 
 
@@ -141,7 +143,7 @@ def foo(string y) returns void:
     if x > 5:
         if c == 'c':
             println("foo")
-    elif: x > 10:
+    elif x > 10:
         println("x was greater than 10")
         
 println(1)
@@ -153,15 +155,15 @@ An \texttt{INDENT} token would be emitted after the \texttt{NEWLINE} on line 3. 
 \subsection{Conventions used in this manual}
 \label{sec:italicized-strings-in-lowercase}
 \label{sec:bar}
-A context-free grammar is used to specify valid syntax for Python++ programs. In this manual, nonterminal symbols will appear as \hyperref[sec:italicized-strings-in-lowercase]{\textit{italicized-strings-in-lowercase}} (clicking the nonterminal will open the section of the document where productions of that nonterminal are defined). Terminals will appear as uppercase strings in a monospaced font. For enhanced legibility, hyphens will be used to separate words within a nonterminal or terminal. An example of a terminal could be  \texttt{TERMINAL}. If there is more than one production for the same nonterminal symbol, the different alternatives will be listed on separate lines.
+A context-free grammar is used to specify valid syntax for Boomslang programs. In this manual, nonterminal symbols will appear as \hyperref[sec:italicized-strings-in-lowercase]{\textit{italicized-strings-in-lowercase}} (clicking the nonterminal will open the section of the document where productions of that nonterminal are defined). Terminals will appear as uppercase strings in a monospaced font. For enhanced legibility, hyphens will be used to separate words within a nonterminal or terminal. An example of a terminal could be  \texttt{TERMINAL}. If a terminal is also a keyword in the language, then it will be colored in orange as in \textcolor{orange}{\texttt{KEYWORD}}. If there is more than one production for the same nonterminal symbol, the different alternatives will be listed on separate lines.
 
 An example of a production would be
 
 \begin{align*}
-    \textit{foo} &\to \hyperref[sec:bar]{\textit{bar}} \texttt{ } \texttt{BAZ}
+    \textit{foo} &\to \hyperref[sec:bar]{\textit{bar}} \texttt{ } \textcolor{orange}{\texttt{CLASS}} \texttt{ } \texttt{BAZ}
 \end{align*}
 
-Which would mean the nonterminal \textit{foo} consists of the nonterminal \textit{bar} followed by the terminal \texttt{BAZ}.
+Which would mean the nonterminal \textit{foo} consists of the nonterminal \textit{bar} followed by the keyword terminal \textcolor{orange}{\texttt{CLASS}} followed by the terminal \texttt{BAZ}.
 
 \subsection{Types}
 \subsubsection{Representation of primitives in memory}
@@ -170,22 +172,22 @@ Which would mean the nonterminal \textit{foo} consists of the nonterminal \texti
     \item \texttt{long} refers to a 64-bit integer and corresponds to \texttt{i64} in LLVM.
     \item \texttt{float} refers to a 32-bit floating point value and corresponds to \texttt{float} in LLVM.
     \item \texttt{char} refers to an ASCII character and corresponds to the \texttt{i8} type in LLVM.
-    \item \texttt{string} refers to an array whose elements are all \texttt{char}. \texttt{string}'s are immutable in Python++.
+    \item \texttt{string} refers to an array whose elements are all \texttt{char}. \texttt{string}'s are immutable in Boomslang.
     \item \texttt{boolean} refers to a value that is either ``true'' or ``false'' and corresponds to the \texttt{i1} type in LLVM.
 \end{itemize}
 
 \subsubsection{Classes}
-The primitive types above can be combined to yield more powerful types. Python++ allows users to define objects which are ``manipulatable regions of storage'' which consist of a struct that has fields made up of primitive types or other objects. Classes in Python++ do not support inheritance.
+The primitive types above can be combined to yield more powerful types. Boomslang allows users to define objects which are ``manipulatable regions of storage'' which consist of a struct that has fields made up of primitive types or other objects. Classes in Boomslang do not support inheritance.
 
 Formally, we say a class definition consists of only the following rule:
 
 \label{sec:classdecl}
 \begin{align*}
-    \textit{classdecl} &\to \texttt{CLASS} \text{ } \texttt{TYPE}: \texttt{NEWLINE} \text{ } \\
-    &\blank \texttt{INDENT} \texttt{ } \texttt{STATIC}: \text{ } \texttt{NEWLINE}  \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \text{ } \\
+    \textit{classdecl} &\to \textcolor{orange}{\texttt{CLASS}} \text{ } \texttt{TYPE}: \texttt{NEWLINE} \text{ } \\
+    &\blank \texttt{INDENT} \texttt{ } \textcolor{orange}{\texttt{STATIC}}: \text{ } \texttt{NEWLINE}  \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \text{ } \\
     &\blank
-    \texttt{DEDENT} \texttt{ } \texttt{REQUIRED}: \text{ } \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ }  \hyperref[sec:vdecls]{\textit{vdecls}} \text{ } \texttt{NEWLINE} \text{ } \\
-    &\blank \texttt{DEDENT} \texttt{ } \texttt{OPTIONAL}: \text{ }  \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \\
+    \texttt{DEDENT} \texttt{ } \textcolor{orange}{\texttt{REQUIRED}}: \text{ } \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ }  \hyperref[sec:vdecls]{\textit{vdecls}} \text{ } \texttt{NEWLINE} \text{ } \\
+    &\blank \texttt{DEDENT} \texttt{ } \textcolor{orange}{\texttt{OPTIONAL}}: \text{ }  \texttt{NEWLINE} \text{ } \texttt{INDENT} \texttt{ } \hyperref[sec:assigns]{\textit{assigns}} \text{ } \texttt{NEWLINE} \\
     &\blank \texttt{DEDENT} \texttt{ } \hyperref[sec:optional-fdecls]{\textit{optional-fdecls}} \texttt{ } \texttt{NEWLINE}
 \end{align*}
 
@@ -206,13 +208,13 @@ Fields within objects can be accessed directly (i.e. without needing to go throu
 \label{sec:object-variable-access}
 \begin{align*}
     \textit{object-variable-access} &\to \texttt{IDENTIFIER}.\texttt{IDENTIFIER} \\
-    &\to \texttt{SELF}.\texttt{IDENTIFIER}
+    &\to \textcolor{orange}{\texttt{SELF}}.\texttt{IDENTIFIER}
 \end{align*}
 
-\texttt{SELF} is a keyword that allows the programmer to access an object's field from within the object itself.
+\textcolor{orange}{\texttt{SELF}} is a keyword that allows the programmer to access an object's field from within the object itself.
 
 \subsubsection{Arrays}
-Arrays are available as an aggregate data type. Arrays can consist of any type, e.g. primitives, objects, or other arrays. Python++ does not allow for nested arrays, so something like \texttt{int[][] x} would not be legal.
+Arrays are available as an aggregate data type. Arrays can consist of any type, e.g. primitives, objects, or other arrays. Boomslang does not allow for nested arrays, so something like \texttt{int[][] x} would not be legal.
 
 Arrays can be defined via the following array literal syntax:
 \label{sec:array-literal}
@@ -221,23 +223,27 @@ Arrays can be defined via the following array literal syntax:
     &\to []
 \end{align*}
 
+The \hyperref[sec:params]{\textit{params}} inside the brackets must all have the same type. Thus [1, ``1'', 2.2] would not be a valid \textit{array-literal}.
+
 The entry at a given index within an array is accessed via the following syntax:
 \label{sec:array-access}
 \begin{align*}
     \textit{array-access} &\to \texttt{IDENTIFIER}[\hyperref[sec:expr]{\textit{expr}}]
 \end{align*}
 
+Note that the \hyperref[sec:expr]{\textit{expr}} inside the brackets for array accesses must evaluate to be an integer, although the parser isn't able to check that.
+
 \subsection{Functions}
 \subsubsection{Function declarations}
-Functions in Python++ do not need to be declared within a class. Functions can either specify their return type using the \texttt{returns} keyword followed by a \texttt{TYPE}, or if this is absent the function will behave as though it returned \texttt{void}.
+Functions in Boomslang do not need to be declared within a class. Functions can either specify their return type using the \texttt{returns} keyword followed by a \texttt{TYPE}, or if this is absent the function will behave as though it returned \texttt{void}.
 
 \label{sec:fdecl}
 \begin{align*}
-    \textit{fdecl} &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}) \texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}): \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}() \texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{DEF} \texttt{ } \texttt{IDENTIFIER}(): \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{DEF} \texttt{ } \texttt{UNDERSCORE} \texttt{ } \texttt{OBJ-OPERATOR}(\texttt{TYPE IDENTIFIER})\texttt{ } \texttt{RETURNS} \texttt{ } \texttt{TYPE}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    \textit{fdecl} &\to \textcolor{orange}{\texttt{DEF}} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}) \texttt{ } \textcolor{orange}{\texttt{RETURNS}} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{DEF}} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:type-params]{\textit{type-params}}): \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{DEF}} \texttt{ } \texttt{IDENTIFIER}() \texttt{ } \textcolor{orange}{\texttt{RETURNS}} \texttt{ } \texttt{TYPE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{DEF}} \texttt{ } \texttt{IDENTIFIER}(): \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{DEF}} \texttt{ } \texttt{UNDERSCORE} \texttt{ } \texttt{OBJ-OPERATOR}(\texttt{TYPE IDENTIFIER})\texttt{ } \textcolor{orange}{\texttt{RETURNS}} \texttt{ } \texttt{TYPE}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
 \end{align*}
 
 An optional block of function declarations can be defined using the following rules:
@@ -252,13 +258,15 @@ Functions can either be called directly or be called as methods on an object. Fu
 
 \label{sec:func-call}
 \begin{align*}
-    \textit{func-call} &\to \texttt{IDENTIFIER} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
-    &\to \texttt{SELF} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
+    \textit{func-call} &\to \texttt{IDENTIFIER}. \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
+    &\to \textcolor{orange}{\texttt{SELF}}.\texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
     &\to \texttt{IDENTIFIER}(\hyperref[sec:params]{\textit{params}}) \\
-    &\to \texttt{IDENTIFIER} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}() \\
-    &\to \texttt{SELF} \texttt{ } \texttt{PERIOD} \texttt{ } \texttt{IDENTIFIER}() \\
+    &\to \texttt{IDENTIFIER}.\texttt{IDENTIFIER}() \\
+    &\to \textcolor{orange}{\texttt{SELF}}.\texttt{IDENTIFIER}() \\
     &\to \texttt{IDENTIFIER}() \\
 \end{align*}
+
+Note that the parentheses are \textit{always} mandatory, even if the function takes no arguments.
 
 \subsection{Expressions}
 \label{sec:expr}
@@ -273,7 +281,7 @@ Thus all of the following productions are valid expressions:
     &\to \texttt{CHAR-LITERAL} \\
     &\to \texttt{STRING-LITERAL} \\
     &\to \texttt{BOOLEAN-LITERAL} \\
-    &\to \texttt{NULL} \\
+    &\to \textcolor{orange}{\texttt{NULL}} \\
 \end{align*}
 
 \subsubsection{Identifiers, functions, and classes}
@@ -312,7 +320,7 @@ Expressions can be wrapped in parentheses. The type and value of an expression a
     &\to \texttt{-}\hyperref[sec:expr]{\textit{expr}} \\
 \end{align*}
 
-\(+\) refers and \(-\) (when appearing between two expressions) refer to addition and subtraction, respectively, and group from left to right. They have equal precedence among themselves and are lower precedence than \(*\), \(/\), and \(\%\).
+All the \hyperref[sec:expr]{\textit{expr}}'s used above for mathematical operators must evaluate to numeric types. See \hyperref[sec:conversions] below for interoperability between different numeric types. \(+\) refers and \(-\) (when appearing between two expressions) refer to addition and subtraction, respectively, and group from left to right. They have equal precedence among themselves and are lower precedence than \(*\), \(/\), and \(\%\).
 
 \(*\), \(/\), and \(\%\) refer to multiplication, division, and modulo, respectively, and group from left to right. They have equal precedence among themselves and are higher precedence than \(+\) and \(-\).
 
@@ -330,7 +338,7 @@ Assignments are also expressions. Assignment operators all have the same precede
     &\to \hyperref[sec:object-variable-access]{\textit{object-variable-access}} \texttt{ = } \hyperref[sec:expr]{\textit{expr}} \\
 \end{align*}
 
-Python++ also includes the update and assign operators \(+=\), \(-=\), \(*=\), and \(/=\). These refer to setting the new value of the left-hand side equal to the old value of the left-hand side plus/minus/times/divided by the value of the right-hand side, respectively.
+Boomslang also includes the update and assign operators \(+=\), \(-=\), \(*=\), and \(/=\). These refer to setting the new value of the left-hand side equal to the old value of the left-hand side plus/minus/times/divided by the value of the right-hand side, respectively.
 
 \label{sec:assign-update}
 \begin{align*}
@@ -359,7 +367,7 @@ Assignments can also be placed in a block, one after the other.
 
 \subsubsection{Boolean operators}
 \label{sec:expr-boolean-operators}
-Python++ supports comparison operators such as greater than, greater than equals, less than, less than equals, not equals, and equals. The language also supports \texttt{not}, \texttt{or}, and \texttt{and}.
+Boomslang supports comparison operators such as greater than, greater than equals, less than, less than equals, not equals, and equals. The language also supports \texttt{not}, \texttt{or}, and \texttt{and}.
 
 All of the boolean operators are left associative. Their precedence, in ascending order of precedence, is \texttt{or}, \texttt{and}, \texttt{not}, followed by \texttt{==}, \texttt{!=}, \texttt{>}, \texttt{<}, \texttt{>=}, and \texttt{<=}, which all have the same level of precedence.
 
@@ -373,16 +381,16 @@ In sum, the valid expressions involving boolean operators are:
     &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ < } \hyperref[sec:expr]{\textit{expr}} \\
     &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ >= } \hyperref[sec:expr]{\textit{expr}} \\
     &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ <= } \hyperref[sec:expr]{\textit{expr}} \\
-    &\to \texttt{NOT} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \\
-    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ OR } \hyperref[sec:expr]{\textit{expr}} \\
-    &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ AND } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \textcolor{orange}{\texttt{NOT}} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \textcolor{orange}{\texttt{ OR }} \hyperref[sec:expr]{\textit{expr}} \\
+    &\to \hyperref[sec:expr]{\textit{expr}} \textcolor{orange}{\texttt{ AND }} \hyperref[sec:expr]{\textit{expr}} \\
 \end{align*}
 
 \texttt{==} and \texttt{!=} check value based equality for primitive types and check pointer equality for user defined types. That is to say, if \texttt{==} or \texttt{!=} are used for user defined objects, they are only deemed equal/not equal based on whether the objects refer to the same location in memory or not, respectively.
 
 \subsection{High-level program structure}
 \subsubsection{The program}
-A program in Python++ is made up of one or more statements, function declarations, class declarations, or newlines in any order, ending with the \texttt{EOF} token.
+A program in Boomslang is made up of one or more statements, function declarations, class declarations, or newlines in any order, ending with the \texttt{EOF} token.
 
 Formally, a program is:
 
@@ -403,14 +411,14 @@ Where \textit{program-without-eof} is:
 \end{align*}
 
 \subsection{Statements}
-Python++ makes a distinction between statements and expressions, even though both can have side effects and an expression by itself can be a statement. Each statement in Python++ is terminated by a \texttt{NEWLINE}. No semicolons are used in Python++.
+Boomslang makes a distinction between statements and expressions, even though both can have side effects and an expression by itself can be a statement. Each statement in Boomslang is terminated by a \texttt{NEWLINE}. No semicolons are used in Boomslang.
 
-Python++ has four types of statements: expressions, return statements, if statements, and loops. Formally, these are specified as:
+Boomslang has four types of statements: expressions, return statements, if statements, and loops. Formally, these are specified as:
 
 \label{sec:stmt}
 \begin{align*}
     \textit{stmt} &\to \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{NEWLINE} \\
-    &\to \texttt{RETURN} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{NEWLINE} \\
+    &\to \textcolor{orange}{\texttt{RETURN}} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{NEWLINE} \\
     &\to \hyperref[sec:if-stmt]{\textit{if-stmt}} \\
     &\to \hyperref[sec:loop]{\textit{loop}} \\
 \end{align*}
@@ -429,30 +437,30 @@ Users can branch on conditionals using if statements. If statements can be used 
 Formally, if statements are defined as:
 \label{sec:if-stmt}
 \begin{align*}
-    \textit{if-stmt} &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \texttt{ELSE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \texttt{ } \texttt{ELSE}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{IF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \\
+    \textit{if-stmt} &\to \textcolor{orange}{\texttt{IF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{IF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \textcolor{orange}{\texttt{ELSE}}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{IF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \texttt{ } \textcolor{orange}{\texttt{ELSE}}: \texttt{ } \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{IF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \texttt{ } \hyperref[sec:elif]{\textit{elif}} \\
 \end{align*}
 
 \label{sec:elif}
 Where \textit{elif} is defined as:
 \begin{align*}
-    \textit{elif} &\to \texttt{ELIF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \hyperref[sec:elif]{\textit{elif}} \texttt{ } \texttt{ELIF} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    \textit{elif} &\to \textcolor{orange}{\texttt{ELIF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \hyperref[sec:elif]{\textit{elif}} \texttt{ } \textcolor{orange}{\texttt{ELIF}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
 \end{align*}
 
 \subsubsection{Loop statements}
-Python++ only offers one kind of loop, a ``loop while'' construct that uses a novel syntax.
+Boomslang only offers one kind of loop, a ``loop while'' construct that uses a novel syntax.
 
 \label{sec:loop}
 \begin{align*}
-    \textit{loop} &\to \texttt{LOOP} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \texttt{WHILE} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
-    &\to \texttt{LOOP} \texttt{ } \texttt{WHILE} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    \textit{loop} &\to \textcolor{orange}{\texttt{LOOP}} \texttt{ } \hyperref[sec:expr]{\textit{expr}} \texttt{ } \textcolor{orange}{\texttt{WHILE}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
+    &\to \textcolor{orange}{\texttt{LOOP}} \texttt{ } \textcolor{orange}{\texttt{WHILE}} \texttt{ } \hyperref[sec:expr]{\textit{expr}}: \texttt{NEWLINE} \texttt{ } \texttt{INDENT} \texttt{ } \hyperref[sec:stmts]{\textit{stmts}} \texttt{ } \texttt{DEDENT} \\
 \end{align*}
 
 \subsection{Parameters and variable declarations}
-As a statically typed language, Python++ requires function declarations to specify the types of parameters. This is done using the following grammar, where each typed parameter is separated by a comma:
+As a statically typed language, Boomslang requires function declarations to specify the types of parameters. This is done using the following grammar, where each typed parameter is separated by a comma:
 
 \label{sec:type-params}
 \begin{align*}
@@ -500,7 +508,7 @@ non-associative & \texttt{UNARY-MINUS} \\
 
 \section{Semantics}
 \subsection{Declaration rules}
-Variables must be defined before they are used. Semantically,
+Variables and functions must be defined before they are used. Semantically,
 \begin{minted}{python}
 int x = 5
 println(x)  # prints 5
@@ -509,7 +517,7 @@ is legal but
 \begin{minted}{python}
 x = 5
 \end{minted}
-is not. The initial declaration of a variable must include its type, but afterwards it can be modified/reassigned without specifying its type. However, when this is done, the new value being assigned to it must match its original value.
+is not. The initial declaration of a variable must include its type, but afterwards it can be modified/reassigned without specifying its type. However, when this is done, the new value being assigned to it must match its original type.
 
 Thus,
 \begin{minted}{python}
@@ -549,7 +557,7 @@ println(x)  # prints 5
 Inside of classes, there is no concept of a public or private variable. All fields within classes are public and are visible throughout the class.
 
 \subsection{Function parameters are passed by value}
-Python++ passes by value. Objects are passed using the Java style, which is like ``passing by value of the reference.'' The following code sample elucidates passing primitives and objects into functions. 
+Boomslang passes by value. Objects are passed using the Java style, which is like ``passing by value of the reference.'' The following code sample elucidates passing primitives and objects into functions. 
 
 \begin{minted}{python}
 class MyObject:
@@ -590,14 +598,29 @@ my_function_2(my_object)
 println(my_old_object == my_object)  # prints "true"
 \end{minted}
 
+\subsection{Overloading}
+The same function name can be reused as long as each one has a unique sequence of type parameters. Thus the following is legal:
+
+\begin{minted}{python}
+def my_function_1(MyObject object_param, int primitive_param) returns int:
+    return primitive_param
+    
+def my_function_1(int primitive_param, MyObject object_param) returns int:
+    return primitive_param
+\end{minted}
+
 \subsection{Mutability}
-Objects in Python++ are mutable by default. Strings and primitives are immutable.
+Objects in Boomslang are mutable by default. Strings and primitives are immutable.
+
+\subsection{Exception handling}
+Boomslang does not support any exception handling features. Thus \texttt{raises}, \texttt{throws}, \texttt{try}, \texttt{catch}, and \texttt{except} are not reserved keywords in the language.
 
 \section{Conversions}
-Some operators in Python++ can cause conversion of the value of the operands from one type to another.  
+\label{sec:conversions}
+Some operators in Boomslang can cause conversion of the value of the operands from one type to another.  
 
 \subsection{Floats and Integers}
-When floats and ints are combined in Python++ arithmetic, the integer is treated as a floating point number and the result is always a float.  This includes arithmetic expressions that include longs. If a long and an int are combined in any arithmetic operator, the result is always of type long.
+When floats and ints are combined in Boomslang arithmetic, the integer is treated as a floating point number and the result is always a float.  This includes arithmetic expressions that include longs. If a long and an int are combined in any arithmetic operator, the result is always of type long.
 
 \subsection{Characters and Strings}
 When a character is added to a string using the \texttt{+} operator for concatenation, i.e. `c' \texttt{+} ``haracter", the resulting data type is a string, in this case ``character".  This string type conversion also occurs when 2 characters are concatenated, e.g. `o'+`k' \texttt{==} ``ok".  Use of the \texttt{+} operator between chars and/or strings always converts to a string.
@@ -605,7 +628,7 @@ When a character is added to a string using the \texttt{+} operator for concaten
 \subsection{Object operators}
 \label{sec:object-operators}
 
-Python++ objects may also contain user-defined infix operator definitions in the form of special function definitions that define how objects work with operators.  The type used in the parameter within the function declaration defines what types can work on the right hand side of the operator.  The return type of the expression is defined by the return  type of the function.  
+Boomslang objects may also contain user-defined infix operator definitions in the form of special function definitions that define how objects work with operators.  The type used in the parameter within the function declaration defines what types can work on the right hand side of the operator.  The return type of the expression is defined by the return  type of the function.  
 
 The following sample code demonstrates how the custom infix operators work in practice:
 \begin{minted}{python}

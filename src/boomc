@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Usage:
-# Running "./boom helloworld.boom" will compile the source to an exe.
-# Running "./boom -r helloworld.boom" will compile and automatically run the exe.
+# Running "./boomc helloworld.boom" will compile the source to an exe.
+# Running "./boomc -r helloworld.boom" will compile and automatically run the exe.
 input_file=$1
 should_execute=false
 if [ "$1" = "-r" ];

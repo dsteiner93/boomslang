@@ -16,7 +16,7 @@ To compile and run this file, the following steps must be executed.
 
 Calling ./helloworld.exe will then print the string "Hello, world!" to the console.
 
-A convenience script inside file "boom" has been provided to automatically execute the above steps. Calling "./boom helloworld.boom" will generate the .exe in one step. Calling "./boom -r helloworld.boom" will generate the .exe and automatically run it.
+A convenience script inside file "boomc" has been provided to automatically execute the above steps. Calling "./boomc helloworld.boom" will generate the .exe in one step. Calling "./boomc -r helloworld.boom" will generate the .exe and automatically run it.
 
 The code for sast.ml, semant.ml, codegen.ml, boomslang.ml, the Makefile, and E2E test suite are still a work in progress. They currently only work for simple println programs.
 
