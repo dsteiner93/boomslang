@@ -10,6 +10,7 @@ type typ =
   Primitive of primitive
 | Class of string
 | Array of typ * int
+| NullType
 
 type bind = typ * string
 
@@ -25,13 +26,12 @@ type expr =
 | Id of string
 | NullExpr
 | Call of call
-| Paren of expr
 | ObjectInstantiation of string * expr list
 | ObjectVariableAccess of object_variable_access
 | ArrayAccess of string * expr
 | ArrayLiteral of expr list
 | Binop of expr * binop * expr
-| Unop of  unaryop * expr
+| Unop of unaryop * expr
 | Assign of assign
 | Update of update
 and call =
@@ -47,6 +47,7 @@ and update =
 type stmt =
   Expr of expr
 | Return of expr
+| ReturnVoid
 | If of expr * stmt list * elif list * stmt list
 | Loop of expr * expr * stmt list
 and elif = expr * stmt list
@@ -81,6 +82,8 @@ let rec mapiplus i f = function
 
 let mapiplus plus f l = mapiplus plus f l
 
+let get_label_without_suffix suffixed_name unsuffixed_name = suffixed_name ^ " [label=\"" ^ unsuffixed_name ^ "\"]"
+
 let new_suffix existing_suffix new_index = existing_suffix ^ (string_of_int new_index)
 
 let get_combine_function start_node subtuple = (start_node ^ " -> " ^ fst subtuple) :: snd subtuple
@@ -88,16 +91,16 @@ let get_combine_function start_node subtuple = (start_node ^ " -> " ^ fst subtup
 let get_single_node_generator node_name suffix subconverter subelement =
   let start_node = node_name ^ suffix in
   let subgraphs = (subconverter suffix 0 subelement) in
-  (start_node, (get_combine_function start_node subgraphs))
+  (start_node, (get_label_without_suffix start_node node_name)::(get_combine_function start_node subgraphs))
 
 let get_multi_node_generator node_name suffix subconverter input_list =
   let start_node = node_name ^ suffix in
   let subgraphs = (List.mapi (subconverter suffix) input_list) in (* List<Tuple<StartNodeString, List<String>> *)
-  (start_node, List.concat (List.map (get_combine_function start_node) subgraphs))
+  (start_node, (get_label_without_suffix start_node node_name)::List.concat (List.map (get_combine_function start_node) subgraphs))
 
 let combine_list node_name suffix input_list =
   let start_node = node_name ^ suffix in
-  (start_node, List.concat (List.map (get_combine_function start_node) input_list))
+  (start_node, (get_label_without_suffix start_node node_name)::List.concat (List.map (get_combine_function start_node) input_list))
 
 let get_op_node_label name suffix symbol = name ^ suffix ^ " [label=\"" ^ symbol ^ "\", color=transparent]"
 let get_prim_node_label name suffix = name ^ suffix ^ " [label=\"" ^ name ^ "\", color=aliceblue, fillcolor=aliceblue, style=filled]"
@@ -118,6 +121,7 @@ let rec string_of_typ existing_suffix new_index =
   Primitive(primitive) -> string_of_primitive suffix 0 primitive
 | Class(class_string) -> ("class" ^ suffix, [get_class_node_label "class" suffix class_string])
 | Array(typ, integer) -> combine_list "array_type" suffix ([string_of_typ suffix 0 typ] @ [string_of_expr suffix 1 (IntLiteral integer)])
+| NullType -> ("NULL" ^ suffix, [get_class_node_label "NULL" suffix "NULL"])
 and string_of_primitive existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -140,7 +144,6 @@ and string_of_expr existing_suffix new_index =
 | Id(id_string) -> string_of_id suffix 0 id_string
 | NullExpr -> ("nullexpr" ^ suffix, [get_literal_node "nullexpr" suffix "NULL"])
 | Call(call) -> string_of_call suffix 0 call
-| Paren(expr) -> get_single_node_generator "paren" suffix string_of_expr expr
 | ObjectInstantiation(id_string, exprs) -> combine_list "object_instantiation" suffix ([string_of_id suffix 0 id_string] @ (mapiplus 1 (string_of_expr suffix) exprs))
 | ObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
 | ArrayAccess(id_string, expr) -> combine_list "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_expr suffix 1 expr])
@@ -199,6 +202,7 @@ let rec string_of_stmt existing_suffix new_index =
   function
   Expr(expr) -> get_single_node_generator "expr" suffix string_of_expr expr
 | Return(expr) -> get_single_node_generator "return" suffix string_of_expr expr
+| ReturnVoid -> combine_list "return" suffix [("returnvoid" ^ suffix, [get_literal_node "returnvoid" suffix ("void")])]
 | If(expr, sl1, elifs, sl2) -> combine_list "if" suffix ([string_of_expr suffix 0 expr] @ (mapiplus 1 (string_of_stmt suffix) sl1) @ (mapiplus (1 + List.length sl1) (string_of_elif suffix) elifs) @ (mapiplus (1 + (List.length sl1) + (List.length elifs)) (string_of_stmt suffix) sl2))
 | Loop(expr1, expr2, sl1) -> combine_list "loop" suffix ([string_of_expr suffix 0 expr1] @ [string_of_expr suffix 1 expr2] @ (mapiplus 2 (string_of_stmt suffix) sl1))
 and

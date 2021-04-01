@@ -1,9 +1,9 @@
-# coms4115project
-The final project for COMS 4115 - Programming Languages and Translators
+# Boomslang
+The final project for COMS 4115 - Programming Languages and Translators (Spring 2021 semester at Columbia University)
 
 Our group is made up of Nathan Cuevas (njc2150), Robert Kim (rk3145), Nikhil Min Kovelamudi (nmk2146), and David Steiner (ds3816).
 
-Our language is called Boomslang and is loosely based on Python. The name was chosen because Boomslang is the name of a snake and it ends in "lang", evoking the word language, as in programming language.
+Our language is called Boomslang and is loosely based on Python. The name was chosen because Boomslang is the name of a snake (evoking Python) and it ends in "lang", evoking the word language, as in "programming language".
 
 For the Hello World milestone, we have the ability to generate programs in our language using our built in print function, println. For instance, a file can be created named foo.boom with the contents println("Hello, world!").
 

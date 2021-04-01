@@ -67,6 +67,8 @@ stmts:
 stmt:
   expr NEWLINE { Expr $1 }
 | RETURN expr NEWLINE { Return $2 }
+| RETURN NEWLINE { ReturnVoid }
+| RETURN VOID NEWLINE { ReturnVoid }
 | if_stmt  { $1 }
 | loop { $1 }
 
@@ -81,7 +83,7 @@ fdecl:
 | DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = List.rev $4; body = List.rev $9} }
 | DEF IDENTIFIER LPAREN RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $6; fname = $2; formals = []; body = List.rev $10} }
 | DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = []; body = List.rev $8} }
-| DEF UNDERSCORE OBJ_OPERATOR LPAREN typ IDENTIFIER RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $9; fname = $3; formals = [($5, $6)]; body = List.rev $13} }
+| DEF UNDERSCORE OBJ_OPERATOR LPAREN typ IDENTIFIER RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $9; fname = "_" ^ $3; formals = [($5, $6)]; body = List.rev $13} }
 
 elif:
   ELIF expr COLON NEWLINE INDENT stmts DEDENT { [($2, List.rev $6)] }
@@ -101,32 +103,32 @@ params: /* these are the params used to invoke a function */
 
 classdecl:
   CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = []; methods = List.rev $6} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = []; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = []; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    INDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = List.rev $10; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = []; methods = List.rev $20} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = List.rev $17; methods = List.rev $20} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = List.rev $17; methods = List.rev $20} }
 
 optional_fdecls:
@@ -144,12 +146,15 @@ vdecls:
 vdecl:
   typ IDENTIFIER { ($1, $2) }
 
-assigns:
-  assign { [$1] }
-| assigns NEWLINE assign { $3::$1 }
+regular_assigns:
+  regular_assign { [$1] }
+| regular_assigns NEWLINE regular_assign { $3::$1 }
+
+regular_assign:
+  typ IDENTIFIER EQ expr { RegularAssign ($1, $2, $4) }
 
 assign:
-  typ IDENTIFIER EQ expr { RegularAssign ($1, $2, $4) }
+  regular_assign { $1 }
 | object_variable_access EQ expr { ObjectVariableAssign ($1, $3) }
 
 assign_update:
@@ -213,7 +218,7 @@ expr:
 | object_variable_access { ObjectVariableAccess $1 }
 | array_access { $1 }
 | array_literal { $1 }
-| LPAREN expr RPAREN { Paren $2 }
+| LPAREN expr RPAREN { $2 }
 | expr PLUS expr { Binop ($1, Plus, $3) }
 | expr MINUS expr { Binop ($1, Subtract, $3) }
 | expr TIMES expr { Binop ($1, Times, $3) }

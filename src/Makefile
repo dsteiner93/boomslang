@@ -9,17 +9,17 @@ boomslang.native :
 	opam config exec -- \
 	ocamlbuild -use-ocamlfind boomslang.native
 
-repl : parser.cmo scanner.cmo ast.cmo repl.cmo
-	ocamlc -w +a -o repl $^
+repl : parser.cmo scanner.cmo ast.cmo sast.cmo semant.cmo repl.cmo
+	ocamlc -w +a-4 -o repl $^
 
 %.cmo : %.ml
-	ocamlc -w +a -c $<
+	ocamlc -w +a-4 -c $<
 
 %.cmi : %.mli
-	ocamlc -w +a -c $<
+	ocamlc -w +a-4 -c $<
 
 %.cmi : %.ml
-	ocamlc -w +a -c $<
+	ocamlc -w +a-4 -c $<
 
 scanner.ml : scanner.mll
 	ocamllex $^
@@ -28,8 +28,8 @@ parser.ml parser.mli : parser.mly
 	ocamlyacc $^
 
 # Depedencies from ocamldep
-repl.cmo : scanner.cmo parser.cmi ast.cmi
-repl.cmx : scanner.cmx parser.cmx ast.cmi
+repl.cmo : scanner.cmo parser.cmi ast.cmi sast.cmi semant.cmi
+repl.cmx : scanner.cmx parser.cmx ast.cmi sast.cmi semant.cmi
 parser.cmo : ast.cmi parser.cmi
 parser.cmx : ast.cmi parser.cmi
 scanner.cmo : parser.cmi

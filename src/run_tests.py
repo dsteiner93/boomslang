@@ -71,15 +71,42 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertNotIn(b"shift/reduce conflicts", stderr)
 
   def test_objoperator_decl_1(self):
-    program = b"Horse winne = yak+#saddle\n"
+    program = b"""
+class Horse:
+	def _+#(Horse other) returns Horse:
+		return Horse()
+Horse yak = Horse()
+Horse saddle = Horse()
+Horse winne = yak+#saddle
+"""
     self.assertProgramPasses(program)
 
   def test_objoperator_decl_2(self):
-    program = b"Horse winne = yak ^&%$ saddle $% poop\n"
+    program = b"""
+class Horse:
+	def _^&%$(Horse other) returns Horse:
+		return Horse()
+
+	def _$%(Horse other) returns Horse:
+		return Horse()
+
+Horse yak = Horse()
+Horse saddle = Horse()
+Horse poop = Horse()
+Horse winne = yak ^&%$ saddle $% poop
+"""
     self.assertProgramPasses(program)
 
   def test_objoperator_ambiguity_1(self):
-    program = b"Horse winne = 8 + yak+#saddle + 6\n"
+    program = b"""
+class Horse:
+	def _+#(Horse other) returns int:
+		return 5
+
+Horse yak = Horse()
+Horse saddle = Horse()
+int winne = 8 + yak+#saddle + 6
+"""
     self.assertProgramPasses(program)
 
   def test_empty_program_passes(self):
@@ -95,7 +122,12 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_simple_assignment_passes_3(self):
-    program = b"string foo = myfunction(1+1+2+3+5)\n"
+    program = b'''
+def myfunc(int x) returns string:
+	return "hey"
+
+string foo = myfunc(1+1+2+3+5)
+'''
     self.assertProgramPasses(program)
 
   def test_simple_assignment_passes_4(self):
@@ -107,11 +139,24 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_assignment_without_type_passes(self):
-    program = b"x = 5\n"
+    program = b"""
+int x = 0
+x = 5
+"""
     self.assertProgramPasses(program)
 
   def test_object_assignment_passes(self):
-    program = b"MyObject foo = MyObject(2, myfunc(2+2)) \n"
+    program = b"""
+class MyObject:
+	required:
+		int x
+		string y
+
+def myfunc(int x) returns string:
+	return "hey"
+
+MyObject foo = MyObject(2, myfunc(2+2))
+"""
     self.assertProgramPasses(program)
 
   def test_arithmetic_passes(self):
@@ -131,11 +176,20 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_array_access_passes(self):
-    program = b"int x = array[6]\n"
+    program = b"""
+int[3] array = [0,1,2]
+int x = array[2]
+"""
     self.assertProgramPasses(program)
 
   def test_null_assignment(self):
-    program = b"int x = NULL\n"
+    program = b'''
+class MyObject:
+	def myfunc():
+		println("hey")
+
+MyObject x = NULL
+'''
     self.assertProgramPasses(program)
 
   def test_single_comments_1(self):
@@ -143,14 +197,14 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_single_comments_2(self):
-    program = b"int x = 2 \n MyObject foo = 2+2 # comment\n\n\n int y = 2\n"
+    program = b"int x = 2 \n int foo = 2+2 # comment\n\n\n int y = 2\n"
     self.assertProgramPasses(program)
 
   def test_multi_comments(self):
     program = b"/#comments\ncomments#/\n"
     
   def test_double_eq(self):
-    program = b"3 == x\n"
+    program = b"int x = 2\n3 == x\n"
     self.assertProgramPasses(program)
 
   def test_newlines_1(self):
@@ -178,11 +232,25 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_self_assignment_with_field(self):
-    program = b"self.x = 5\n"
+    program = b"""
+class MyClass:
+	required:
+		int x
+
+	def myfunc():
+		self.x = 5
+"""
     self.assertProgramPasses(program)
 
   def test_self_with_expression(self):
-    program = b"int x = self.foo * 5\n"
+    program = b'''
+class MyClass:
+	required:
+		int foo
+
+	def myfunc():
+		int x = self.foo * 5
+'''
     self.assertProgramPasses(program)
 
   def test_self_access_with_function(self):
@@ -190,19 +258,51 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_object_variable_access(self):
-    program = b"myobject.x \n"
+    program = b"""
+class MyObject:
+	static:
+		int x = 5
+
+MyObject myobject = MyObject()
+myobject.x
+"""
     self.assertProgramPasses(program)
 
   def test_object_variable_assignment(self):
-    program = b"myobject.fOOo12345 = true\n"
+    program = b"""
+class MyObject:
+	required:
+		boolean fOOo12345
+
+MyObject myobject = MyObject(false)
+
+myobject.fOOo12345 = true
+"""
     self.assertProgramPasses(program)
 
   def test_object_variable_with_expression(self):
-    program = b"boolean x = true and myobject.is_this_true\n"
+    program = b'''
+class MyObject:
+	static:
+		boolean is_this_true = true
+
+MyObject myobject = MyObject()
+boolean x = true and myobject.is_this_true
+'''
     self.assertProgramPasses(program)
 
   def test_object_function_call(self):
-    program = b"myobject.myfunction(a, b, c)\n\n"
+    program = b'''
+class MyObject:
+	def myfunction(int a, string b, boolean c):
+		println("hey")
+
+int a = 5
+string b = "foo"
+boolean c = false
+MyObject myobject = MyObject()
+myobject.myfunction(a, b, c)
+'''
     self.assertProgramPasses(program)
 
   def test_long_initialization_passes(self):
@@ -210,11 +310,17 @@ class TestLexerAndParser(unittest.TestCase):
     self.assertProgramPasses(program)
 
   def test_valid_minus_eq(self):
-    program = b"fOo -= 500L\n"
+    program = b"long fOo = 10L\nfOo -= 500L\n"
     self.assertProgramPasses(program)
 
   def test_valid_divide_eq_with_object(self):
-    program = b"myobject.heY /= 20\n"
+    program = b'''
+class MyObject:
+	required:
+		int heY
+MyObject myobject = MyObject(5)
+myobject.heY /= 20
+'''
     self.assertProgramPasses(program)
 
   def test_valid_char_literal_1(self):
@@ -327,7 +433,7 @@ class MyObject:
 
 
 	optional:
-		boolean x = true
+		boolean boo = true
 """
     self.assertProgramPasses(program)
 
@@ -346,7 +452,7 @@ class MyObject:
 
 
 	optional:
-		boolean x = true
+		boolean boo = true
 
 """
     self.assertProgramPasses(program)
@@ -366,7 +472,7 @@ class MyObject:
 
 
 	optional:
-		boolean x = true
+		boolean boo = true
 
 
 	def mymethod():
@@ -394,7 +500,7 @@ class MyObject:
 
 
 	optional:
-		boolean x = true
+		boolean boo = true
 
 
 	def mymethod():
@@ -408,7 +514,7 @@ class MyObject:
 
 	def _++%%(MyObject other) returns MyObject:
 		return MyObject()
-	def mymethod2(int x):
+	def mymethod2(int x) returns int:
 		return 5
 """
     self.assertProgramPasses(program)
@@ -481,15 +587,17 @@ class MyObjectTwo:
 
   def test_loop_1(self):
     program = b"""
-loop x+1 while x<100:
-	print("hey")
+int x = 0
+loop x+=1 while x<100:
+	println("hey")
 """
     self.assertProgramPasses(program)
 
   def test_loop_2(self):
     program = b"""
+int x = 0
 loop while x<100:
-	print("hey")
+	println("hey")
 """
     self.assertProgramPasses(program)
 

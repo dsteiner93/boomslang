@@ -10,9 +10,10 @@
    program should end with "Passed" when you hit ctrl-D. If you
    enter an invalid program, it will give you a parse error.
 *)
-open Ast
+open Sast
 
 let _ =
   let lexbuf = Lexing.from_channel stdin in
   let ast = Parser.program Scanner.read_next_token lexbuf in
-  print_endline ("Passed\n" ^ (graphviz_string_of_program ast))
+  let sast = Semant.check ast in
+  print_endline ("Passed\n" ^ (graphviz_string_of_sprogram sast))
