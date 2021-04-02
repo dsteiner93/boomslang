@@ -8,7 +8,7 @@ import unittest
 
 _PASSED = b"Passed\n"
 
-class TestLexerAndParser(unittest.TestCase):
+class TestBoomslang(unittest.TestCase):
 
   def setUp(self):
     self.makeClean()
