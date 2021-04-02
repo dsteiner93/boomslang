@@ -247,9 +247,9 @@ and
 check_exprs_have_same_type = function
   [] -> ()
 | [(_, _)] -> ()
-| ((typ1, _) :: (typ2, _) :: _) when typ1 <> typ2 ->
+| (typ1, _) :: (typ2, _) :: _ when typ1 <> typ2 ->
        raise (Failure ("Array literal had incompatible types " ^ (str_of_typ typ1) ^ " " ^ (str_of_typ typ2)))
-| _ -> ()
+| _::tl -> check_exprs_have_same_type tl
 and
 check_array_literal exprs v_symbol_tables =
   if (List.length exprs) = 0 then (NullType, (SArrayLiteral []))
@@ -368,6 +368,44 @@ check_stmt v_symbol_tables expected_rtype = function
 | If(if_cond_expr, if_stmt_list, elif_list, else_stmt_list) -> (check_if if_cond_expr if_stmt_list elif_list else_stmt_list v_symbol_tables expected_rtype)
 | Loop(update_expr, cond_expr, stmt_list) -> check_loop update_expr cond_expr stmt_list v_symbol_tables expected_rtype
 and
+elif_always_returns elif =
+  let stmt_list = (snd elif) in
+  stmts_always_return stmt_list
+and
+all_are_true l = (* Check if all elements of a list are true *)
+  not (List.mem false l)
+and
+stmt_always_returns = function
+  Expr(_) -> false (* expressions are not returns *)
+| ReturnVoid -> true
+| Return(_) -> true (* Return statements always return *)
+| If(_, if_stmt_list, elif_list, else_stmt_list) ->
+    (* Checking if ifs always return is more complicated. *)
+    if List.length else_stmt_list > 0 then
+      (stmts_always_return if_stmt_list) && (all_are_true (List.map elif_always_returns elif_list)) && (stmts_always_return else_stmt_list)
+    else false (* Technically, if there is an elseless if, it always returns if the if statement is always true
+                  and the if_stmt_list always returns, or if there is an elseless if+elifs, it always returns if the
+                  if+elifs are always true and their stmt lists always return. But this is too complicated to check,
+                  since we may not know if an if will always return true, as the expr in an if can be generated at
+                  runtime. *)
+| Loop(_, _, _) -> false (* Similar to the above, a loop always returns if its body always returns, but that requires
+                         knowing whether the loop is guaranteed to be entered, which relies on information that may
+                         not be known at compile time. *)
+and
+(* Given a stmt_list, determine if it always returns.
+   This is needed for the following semantic checks:
+   -If a statement always returns, then any code after it is unreachable.
+   -If a function has a non-void return, then its statement list must always return. *)
+stmts_always_return = function
+  [] -> false
+| hd::tl -> let first_statement_returns = (stmt_always_returns hd) in
+            if first_statement_returns && (List.length tl > 0) then
+              raise (Failure("Found unreachable code."))
+            else if first_statement_returns && (List.length tl == 0) then
+              true
+            else (* First statement did not always return, so check if the next ones did. *)
+              stmts_always_return tl
+and
 check_stmt_list v_symbol_tables expected_rtype = function
   [ReturnVoid as s] -> [check_stmt v_symbol_tables expected_rtype s]
 | [Return(_) as s] -> [check_stmt v_symbol_tables expected_rtype s]
@@ -384,7 +422,13 @@ check_binds (kind : string) (binds : bind list) = (* check_binds was stolen from
     | _ -> ()) binds;
   dups kind (List.sort (fun (a) (b) -> compare a b) (List.map (snd) binds))
 and
-check_fdecl v_symbol_tables fdecl = (ignore (check_binds ("fdecl " ^ fdecl.fname) fdecl.formals)); { srtype = fdecl.rtype; sfname = fdecl.fname; sformals = fdecl.formals; sbody = check_stmt_list ((get_hash_of_binds fdecl.formals)::v_symbol_tables) fdecl.rtype fdecl.body }
+check_fdecl v_symbol_tables fdecl = (ignore (check_binds ("fdecl " ^ fdecl.fname) fdecl.formals));
+  (let all_branches_return = stmts_always_return fdecl.body in
+   if fdecl.rtype <> Primitive(Void) && (not all_branches_return) then
+     (* If the function return type is not void, it must return in every branch *)
+     raise (Failure("Function " ^ fdecl.fname ^ " had a non-void return but had branches that never returned."))
+   else
+     { srtype = fdecl.rtype; sfname = fdecl.fname; sformals = fdecl.formals; sbody = check_stmt_list ((get_hash_of_binds fdecl.formals)::v_symbol_tables) fdecl.rtype fdecl.body })
 and
 
 get_names_from_assign = function

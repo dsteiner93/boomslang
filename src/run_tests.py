@@ -40,7 +40,8 @@ class TestBoomslang(unittest.TestCase):
     self.assertEqual(b"", stdout)
     self.assertTrue(b"lexing: empty token" in stderr or
                     b"Stdlib.Parsing.Parse_error" in stderr or
-                    b"Illegal" in stderr)
+                    b"Illegal" in stderr or
+                    b"Fatal error" in stderr)
 
   def assertProgram(self, program, passes=True):
     self.make()
@@ -351,7 +352,7 @@ def myfunc(int x, MyObject foo) returns string:
 			println("hey")
 		else:
 			println("hey")
-
+	return "hey"
 
 
 
@@ -368,14 +369,19 @@ def myfunc(int x, MyObject foo) returns string:
 	if x > 5:
 		if x > 10:
 			int z = 20
+			return "hey"
 		elif x > 20:
 			println("hey")
+			return "hey"
 		elif x > 30:
 			println("hey")
 			println("hey")
+			return "hey"
 		else:
 			println("hey")
-
+			return "hey"
+	else:
+		return "hey"
 
 
 def myfunc2(int x, MyObject foo) returns string:
@@ -391,7 +397,7 @@ def myfunc2(int x, MyObject foo) returns string:
 			println("hey")
 		else:
 			println("hey")
-
+	return "hey"
 
 
 
@@ -402,7 +408,7 @@ int x = 50
   def test_complicated_program_3(self):
     program = b"""
 int x = 5
-def myfunc(int x, MyObject foo) returns string:
+def myfunc(int x, MyObject foo) returns void:
 	int y = 5
 	int z = 7
 	if x > 5:
@@ -609,6 +615,58 @@ loop while x<100:
     program = b'println("hello world")'
     self.assertProgramPasses(program)
 
+  def test_valid_returns_succeeds(self):
+    program = b'''
+def my_func() returns int:
+	if x > 5:
+		println("hey")
+	else:
+		return 5
+	return 1
+'''
+    self.assertProgramPasses(program)
+
+  def test_valid_construct_succeeds(self):
+    program = b'''
+class MyClass:
+	def print_5():
+		println("5")
+
+MyClass my_object = MyClass()
+MyClass x = my_object
+x.print_5()
+'''
+    self.assertProgramPasses(program)
+
+  def test_valid_array_succeeds(self):
+    program = b'''
+def my_func(int x) returns int:
+	return x
+
+int[5] my_array = [1, (2+2), my_func(1), my_func(1) + 1, 2 * (3 + 1)]
+'''
+    self.assertProgramPasses(program)
+
+  def test_valid_not_succeeds(self):
+    program = b'''
+boolean x = true
+not x
+'''
+    self.assertProgramPasses(program)
+
+  def test_valid_neg_succeeds(self):
+    program = b'''
+int x = -1
+x = -x
+'''
+    self.assertProgramPasses(program)
+
+  def test_valid_returns_succeeds(self):
+    program = b'''
+
+'''
+    self.assertProgramPasses(program)
+
   def test_nonsense_fails(self):
     program = b"%-$_? !?\n"
     self.assertProgramFails(program)
@@ -756,6 +814,121 @@ int x = 50
     program = b"""
 loop x+2 while:
 	2+2
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_returns_1(self):
+    program = b'''
+def my_func() returns int:
+	if x > 5:
+		println("hey")
+	else:
+		return 5
+'''
+    self.assertProgramFails(program)
+
+  def test_bad_returns_2(self):
+    program = b'''
+def my_func() returns int:
+	println("hey")
+'''
+    self.assertProgramFails(program)
+
+  def test_bad_constructor_1(self):
+    program = b'''
+class MyClass:
+	static:
+		my_object.x = 5
+'''
+    self.assertProgramFails(program)
+
+  def test_bad_constructor_2(self):
+    program = b'''
+class MyClass:
+	static:
+		void x = NULL
+'''
+    self.assertProgramFails(program)
+
+  def test_void_assignment_fails(self):
+    program = b"""void x = 5"""
+    self.assertProgramFails(program)
+
+  def test_null_assignment_fails(self):
+    program = b"""NULL x = NULL"""
+    self.assertProgramFails(program)
+
+  def test_duplicate_function_args_fails(self):
+    program = b"""
+def my_func(int x, float x) -> returns int:
+	return 5
+"""
+    self.assertProgramFails(program)
+
+  def test_invalid_array_access_fails(self):
+    program = b"""
+int x = 5
+x[5]
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_negation_fails(self):
+    program = b"""
+boolean x = true
+-x
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_not_fails(self):
+    program = b"""
+int x = 5
+not x
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_array_init_fails(self):
+    program = b"""
+def my_func(int x) returns string:
+	return "hey"
+
+int[5] my_array = [1, (2+2), my_func(1), my_func(1) + 1, 2 * (3 + 1)]
+"""
+    self.assertProgramFails(program)
+
+  def test_invalid_type_return_fails_1(self):
+    program = b"""
+def my_func() returns int:
+	if x > 5:
+		return
+	else:
+		return 5
+"""
+    self.assertProgramFails(program)
+
+  def test_invalid_type_return_fails_2(self):
+    program = b"""
+def my_func() returns int:
+	if x > 5:
+		return "string"
+	else:
+		return 5
+"""
+    self.assertProgramFails(program)
+
+  def test_nothing_comes_after_return(self):
+    program = b"""
+def myfunc():
+  return
+  println("hey")
+"""
+    self.assertProgramFails(program)
+
+  def test_no_matching_signature_fails(self):
+    program = b"""
+def myfunc(string x) returns int:
+  return 5
+
+myfunc(5)
 """
     self.assertProgramFails(program)
 
