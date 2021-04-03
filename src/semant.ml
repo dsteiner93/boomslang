@@ -8,8 +8,14 @@ type function_signature = {
   formal_types: typ list;
 }
 
+type lhsrhs = {
+  lhs: typ;
+  rhs: typ;
+}
+
 module StringMap = Map.Make(String);;
 module SignatureMap = Map.Make(struct type t = function_signature let compare = compare end);;
+module LhsRhsMap = Map.Make(struct type t = lhsrhs let compare = compare end);;
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
   let equal x y = x = y (* use structural comparison *)
@@ -51,11 +57,46 @@ let get_hash_of_binds bind_list =
   (List.iter (add_to_hash hash) bind_list); hash
 in
 
-let built_in_funcs = [ ({ fs_name = "println"; formal_types = [Primitive(String)] }, Primitive(Void)) ]
+let built_in_funcs = [
+  ({ fs_name = "println"; formal_types = [Primitive(String)] }, Primitive(Void));
+  ({ fs_name = "int_to_string"; formal_types = [Primitive(Int)] }, Primitive(String));
+  ({ fs_name = "long_to_string"; formal_types = [Primitive(Long)] }, Primitive(String));
+  ({ fs_name = "float_to_string"; formal_types = [Primitive(Float)] }, Primitive(String));
+  ({ fs_name = "char_to_string"; formal_types = [Primitive(Char)] }, Primitive(String));
+  ({ fs_name = "bool_to_string"; formal_types = [Primitive(Bool)] }, Primitive(String));
+  ({ fs_name = "int_to_long"; formal_types = [Primitive(Int)] }, Primitive(Long));
+  ({ fs_name = "int_to_float"; formal_types = [Primitive(Int)] }, Primitive(Float));
+]
 in
 let add_built_in map built_in = SignatureMap.add (fst built_in) (snd built_in) map
 in
 let built_in_func_map = List.fold_left add_built_in SignatureMap.empty built_in_funcs
+in
+
+(* Functions to coerce one type into another via a built-in function *)
+let wrap_to_string checked_exprs = match checked_exprs with
+  [(Primitive(Int), _)] -> (Primitive(String), SCall(SFuncCall("int_to_string", checked_exprs)))
+| [(Primitive(Long), _)] -> (Primitive(String), SCall(SFuncCall("long_to_string", checked_exprs)))
+| [(Primitive(Float), _)] -> (Primitive(String), SCall(SFuncCall("float_to_string", checked_exprs)))
+| [(Primitive(Char), _)] -> (Primitive(String), SCall(SFuncCall("char_to_string", checked_exprs)))
+| [(Primitive(Bool), _)] -> (Primitive(String), SCall(SFuncCall("bool_to_string", checked_exprs)))
+| [(NullType, _)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
+| _ -> raise (Failure("Expected exactly 1 expression of a non-void primitive or null type."))
+in
+let wrap_int_to_long checked_exprs = match checked_exprs with
+  [(Primitive(Int), _)] -> (Primitive(Long), SCall(SFuncCall("int_to_long", checked_exprs)))
+| _ -> raise (Failure("Expected exactly 1 expression of type int."))
+in
+let wrap_int_to_float checked_exprs = match checked_exprs with
+  [(Primitive(Int), _)] -> (Primitive(Float), SCall(SFuncCall("int_to_float", checked_exprs)))
+| _ -> raise (Failure("Expected exactly 1 expression of type int."))
+in
+let coerceable_types = [
+  ({ lhs = Primitive(Long); rhs = Primitive(Int) }, wrap_int_to_long);
+  ({ lhs = Primitive(Float); rhs = Primitive(Int) }, wrap_int_to_float);
+] in
+let add_to_map map coerceable_type = LhsRhsMap.add (fst coerceable_type) (snd coerceable_type) map in
+let coerceable_types_map = List.fold_left add_to_map LhsRhsMap.empty coerceable_types
 in
 
 (* First, figure out all the defined functions *)
@@ -78,7 +119,6 @@ in
 (* For each class, generate 1-2 constructor signatures, corresponding to the required and optional fields. *)
 let get_bind_from_assign = function
   RegularAssign(typ, name, _) -> (typ, name)
-| _ -> raise (Failure("Found non-regular assign in an unexpected place"))
 in
 let get_required_only_signature classdecl =
   { fs_name = "construct"; formal_types = (List.map (fst) classdecl.required_vars) }
@@ -116,7 +156,6 @@ let class_variable_types =
 let add_class_variable map tuple = StringMap.add (fst tuple) (snd tuple) map in
 let get_tuple_from_assign = function
   RegularAssign(typ, str, _) -> (str, typ)
-| _ -> raise (Failure("Unexpected assign encountered"))
 in
 let get_tuple_from_bind bind = (snd bind, fst bind) in
 let add_class_variables map = function
@@ -135,7 +174,20 @@ in
 let rec check_fcall fname actuals v_symbol_tables =
   let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
   let signature = { fs_name = fname; formal_types = List.map (fst) checked_exprs } in
-  if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, checked_exprs))) else raise (Failure("No matching signature found for function call"))
+  if fname = "println" && (List.length actuals) = 1 then
+    (* Special convenience code to wrap all primitives to become a valid print call *)
+    let wrapped_checked_exprs = match checked_exprs with
+        [(Primitive(Int), _)] -> [wrap_to_string checked_exprs]
+      | [(Primitive(Long), _)] -> [wrap_to_string checked_exprs]
+      | [(Primitive(Float), _)] -> [wrap_to_string checked_exprs]
+      | [(Primitive(Char), _)] -> [wrap_to_string checked_exprs]
+      | [(Primitive(Bool), _)] -> [wrap_to_string checked_exprs]
+      | [(NullType, _)] -> [wrap_to_string checked_exprs]
+      | _ -> checked_exprs in
+    let signature = { fs_name = fname; formal_types = List.map (fst) wrapped_checked_exprs } in
+    if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, wrapped_checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
+  else
+    if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
 and
 
 check_mcall object_name fname actuals v_symbol_tables =
@@ -159,7 +211,6 @@ check_call v_symbol_tables = function
 and
 
 check_object_variable_access v_symbol_tables object_variable_access =
-  (* First get the type of the object name. If it is not a class type, that is an error. *)
   let object_type = (type_of_identifier v_symbol_tables (fst object_variable_access)) in
   match object_type with
     Class(class_name) -> (* Then check that the variable being accessed on the class actually exists *)
@@ -187,49 +238,66 @@ check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
 
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
+  let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   if rhs_type = lhs_type then
     ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
+  else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
+    let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
+    ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, (converter [checked_expr]))))
   else
     raise (Failure(("Illegal assignment. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
-and
-check_object_variable_assign object_variable_access rhs_expr v_symbol_tables =
-  let checked_object_variable_access = check_object_variable_access v_symbol_tables object_variable_access in
-  let lhs_type = (fst checked_object_variable_access) in
-  let checked_expr = (check_expr v_symbol_tables rhs_expr) in
-  let rhs_type = (fst checked_expr) in
-  if rhs_type = lhs_type then SObjectVariableAssign(object_variable_access, checked_expr)
-  else raise (Failure(("Illegal assignment. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
 and
 
 check_assign v_symbol_tables = function
   RegularAssign(lhs_type, lhs_name, rhs_expr) -> (check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables)
-| ObjectVariableAssign(object_variable_access, rhs_expr) -> (check_object_variable_assign object_variable_access rhs_expr v_symbol_tables)
 and
 
 check_regular_update id updateop rhs_expr v_symbol_tables =
   let lhs_type = (type_of_identifier v_symbol_tables id) in
   let checked_expr = check_expr v_symbol_tables rhs_expr in
   let rhs_type = (fst checked_expr) in
+  let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   match updateop with
-    Eq | PlusEq | MinusEq | TimesEq | DivideEq ->
+    Eq ->
           if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, checked_expr)))
+          else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
+            let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
+            ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, (converter [checked_expr]))))
           else raise (Failure(("Illegal update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
 and
-
 check_object_variable_update object_variable_access updateop rhs_expr v_symbol_tables =
   let checked_object_variable_access = check_object_variable_access v_symbol_tables object_variable_access in
   let lhs_type = (fst checked_object_variable_access) in
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
+  let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   match updateop with
-    Eq | PlusEq | MinusEq | TimesEq | DivideEq ->
+    Eq ->
           if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SObjectVariableUpdate(object_variable_access, updateop, checked_expr)))
-          else raise (Failure(("Illegal update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
+          else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
+            let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
+            ((fst checked_expr), SUpdate (SObjectVariableUpdate(object_variable_access, updateop, (converter [checked_expr]))))
+          else raise (Failure(("Illegal object variable update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
 and
-
+check_array_access_update array_access updateop rhs_expr v_symbol_tables =
+  let checked_array_access = check_array_access (fst array_access) (snd array_access) v_symbol_tables in
+  let sarray_access = match (snd checked_array_access) with SArrayAccess(tuple) -> tuple | _ -> raise (Failure("Found unexpected type while checking array access updates.")) in
+  let lhs_type = (fst checked_array_access) in
+  let checked_expr = (check_expr v_symbol_tables rhs_expr) in
+  let rhs_type = (fst checked_expr) in
+  let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
+  match updateop with
+    Eq ->
+          if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, checked_expr)))
+          else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
+            let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
+            ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, (converter [checked_expr]))))
+          else raise (Failure(("Illegal array update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
+and
 check_update v_symbol_tables = function
   RegularUpdate(id, updateop, expr) -> check_regular_update id updateop expr v_symbol_tables
 | ObjectVariableUpdate(object_variable_access, updateop, expr) -> check_object_variable_update object_variable_access updateop expr v_symbol_tables
+| ArrayAccessUpdate(array_access, updateop, expr) -> check_array_access_update array_access updateop expr v_symbol_tables
 and
 
 check_array_access array_name expr v_symbol_tables =
@@ -271,16 +339,55 @@ check_unop unaryop expr v_symbol_tables =
             | _ -> raise (Failure("Attempted to call unary op - on something that wasn't a number")))
 and
 
-check_binop lhs binop rhs v_symbol_tables =
+coerce_binop_exprs checked_lhs checked_rhs =
+  let lhs_type = (fst checked_lhs) in
+  let rhs_type = (fst checked_rhs) in
+  if lhs_type = Primitive(Int) && rhs_type = Primitive(Long) then
+    ((wrap_int_to_long [checked_lhs]), checked_rhs)
+  else if lhs_type = Primitive(Long) && rhs_type = Primitive(Int) then
+    (checked_lhs, (wrap_int_to_long [checked_rhs]))
+  else if lhs_type = Primitive(Int) && rhs_type = Primitive(Float) then
+    ((wrap_int_to_float [checked_lhs]), checked_rhs)
+  else if lhs_type = Primitive(Float) && rhs_type = Primitive(Int) then
+    (checked_lhs, (wrap_int_to_float [checked_rhs]))
+  else if lhs_type = Primitive(String) then
+    (checked_lhs, (wrap_to_string [checked_rhs]))
+  else if rhs_type = Primitive(String) then
+    ((wrap_to_string [checked_lhs]), checked_rhs)
+  else
+    raise (Failure("No coercrion rule found for " ^ (str_of_typ lhs_type) ^ " and " ^ (str_of_typ rhs_type)))
+and
+check_binop_coerced checked_lhs binop checked_rhs =
+  let lhs_type = (fst checked_lhs) in
   match binop with
-  Plus | Subtract | Times | Divide | Modulo ->
+    Plus -> (match lhs_type with
+        Primitive(Int) | Primitive(Long) | Primitive(Float) | Primitive(String) ->
+          (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
+      | _ -> raise (Failure("Binop + is not available for type " ^ (str_of_typ lhs_type))))
+
+    | Subtract | Times | Divide | Modulo -> (match lhs_type with
+        Primitive(Int) | Primitive(Long) | Primitive(Float) -> (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
+      | _ -> raise (Failure("Binops -, *, /, and % are not available for type " ^ (str_of_typ lhs_type))))
+
+    | DoubleEq -> (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
+
+    | BoGT | BoLT | BoGTE | BoLTE -> (match lhs_type with
+        Primitive(Int) | Primitive(Long) | Primitive(Float) -> (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
+      | _ -> raise (Failure("Operators > < >= <= are not available for type " ^ (str_of_typ lhs_type))))
+    | BoOr | BoAnd -> (match lhs_type with
+        Primitive(Bool) -> (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
+      | _ -> raise (Failure("or and and must take boolean types, not " ^ (str_of_typ lhs_type))))
+and
+check_binop lhs binop rhs v_symbol_tables =
   let checked_lhs = (check_expr v_symbol_tables lhs) in
   let checked_rhs = (check_expr v_symbol_tables rhs) in
-  ((fst checked_lhs), SBinop(checked_lhs, binop, checked_rhs))
-| DoubleEq | NotEq | BoGT | BoLT | BoGTE | BoLTE | BoOr | BoAnd ->
-  let checked_lhs = (check_expr v_symbol_tables lhs) in
-  let checked_rhs = (check_expr v_symbol_tables rhs) in
-  (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
+  let lhs_type = (fst checked_lhs) in
+  let rhs_type = (fst checked_rhs) in
+  if lhs_type = rhs_type then
+    check_binop_coerced checked_lhs binop checked_rhs
+  else
+    let lhs_rhs = coerce_binop_exprs checked_lhs checked_rhs in
+    check_binop_coerced (fst lhs_rhs) binop (snd lhs_rhs)
 and
 
 check_object_instantiation class_name exprs v_symbol_tables =
@@ -304,6 +411,7 @@ check_expr v_symbol_tables = function
 | BoolLiteral(b) -> (Primitive(Bool), SBoolLiteral(b))
 | Id(id_str) -> (type_of_identifier v_symbol_tables id_str, SId(id_str))
 | NullExpr -> (NullType, SNullExpr)
+| Self -> (type_of_identifier v_symbol_tables "self", SSelf)
 | Call(call) -> check_call v_symbol_tables call
 | ObjectInstantiation(class_name, exprs) -> check_object_instantiation class_name exprs v_symbol_tables
 | ObjectVariableAccess(object_variable_access) -> check_object_variable_access v_symbol_tables object_variable_access
@@ -314,8 +422,7 @@ check_expr v_symbol_tables = function
 | Assign(assign) ->
     (let checked_assign = (check_assign v_symbol_tables assign) in
      match checked_assign with
-       SRegularAssign(lhs_type, _, _) -> (lhs_type, SAssign(checked_assign))
-     | SObjectVariableAssign(_, checked_expr) -> ((fst checked_expr), SAssign(checked_assign)))
+       SRegularAssign(lhs_type, _, _) -> (lhs_type, SAssign(checked_assign)))
 | Update(update) -> check_update v_symbol_tables update
 and
 
@@ -427,24 +534,25 @@ check_fdecl v_symbol_tables fdecl = (ignore (check_binds ("fdecl " ^ fdecl.fname
    if fdecl.rtype <> Primitive(Void) && (not all_branches_return) then
      (* If the function return type is not void, it must return in every branch *)
      raise (Failure("Function " ^ fdecl.fname ^ " had a non-void return but had branches that never returned."))
+   (* Check that return type of constructor is always void *)
+   else if (fdecl.fname = "construct" && fdecl.rtype <> Primitive(Void)) then
+     raise (Failure("Found constructor that had rtype " ^ (str_of_typ fdecl.rtype) ^ " rather than void."))
    else
      { srtype = fdecl.rtype; sfname = fdecl.fname; sformals = fdecl.formals; sbody = check_stmt_list ((get_hash_of_binds fdecl.formals)::v_symbol_tables) fdecl.rtype fdecl.body })
 and
 
 get_names_from_assign = function
   RegularAssign(_, name, _) -> name
-| _ -> raise (Failure("Found non-regular assign inside class variable initializations"))
 and
 get_all_class_variable_names classdecl = (List.map get_names_from_assign classdecl.static_vars) @ (List.map (snd) classdecl.required_vars) @ (List.map get_names_from_assign classdecl.optional_vars)
 and
 get_sstmt_from_bind bind =
   let typ = (fst bind) in
   let name = (snd bind) in
-  SExpr (typ, SAssign(SObjectVariableAssign(("self", name), (typ, SId(name)))))
+  SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name), Eq, (typ, SId(name)))))
 and
 get_sstmt_from_assign_with_default v_symbol_tables = function
-  RegularAssign(typ, name, expr) -> SExpr (typ, SAssign(SObjectVariableAssign(("self", name), (check_expr v_symbol_tables expr))))
-| _ -> raise (Failure("Found non-regular assign in an unexpected place"))
+  RegularAssign(typ, name, expr) -> SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name), Eq, (check_expr v_symbol_tables expr))))
 and
 get_required_only_constructor v_symbol_tables classdecl =
   let body = (List.map get_sstmt_from_bind classdecl.required_vars) @ (List.map (get_sstmt_from_assign_with_default v_symbol_tables) classdecl.optional_vars) in
@@ -481,6 +589,8 @@ check_classdecl v_symbol_tables classdecl =
   let checked_static_vars = List.map (check_assign new_v_symbol_tables) classdecl.static_vars in
   let checked_required_vars = (ignore (check_binds ("classdecl " ^ classdecl.cname) classdecl.required_vars)); classdecl.required_vars in
   let checked_optional_vars = List.map (check_assign new_v_symbol_tables) classdecl.optional_vars in
+  (* Inside this class, make sure "self" by itself points to this class type *)
+  let _ = StringHash.add (List.hd new_v_symbol_tables) "self" (Class(classdecl.cname)) in
   let checked_fdecls = List.map (check_fdecl new_v_symbol_tables) classdecl.methods in
   { scname = classdecl.cname; sstatic_vars = checked_static_vars; srequired_vars = checked_required_vars; soptional_vars = checked_optional_vars; smethods = (add_autogenerated_constructors v_symbol_tables classdecl checked_fdecls) }
 and

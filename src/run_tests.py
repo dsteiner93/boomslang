@@ -229,7 +229,14 @@ MyObject x = NULL
     self.assertProgramPasses(program)
 
   def test_self_access_with_field(self):
-    program = b"self.x\n"
+    program = b"""
+class Foo:
+	optional:
+		string x = "str"
+
+	def myfunc():
+		self.x
+"""
     self.assertProgramPasses(program)
 
   def test_self_assignment_with_field(self):
@@ -255,7 +262,15 @@ class MyClass:
     self.assertProgramPasses(program)
 
   def test_self_access_with_function(self):
-    program = b"self.myfunction(2 % 3) \n"
+    program = b"""
+class MyClass:
+
+	def myfunction(int x):
+		println("hey")
+
+	def myfunction2():
+		self.myfunction(2 % 3)
+"""
     self.assertProgramPasses(program)
 
   def test_object_variable_access(self):
@@ -482,10 +497,10 @@ class MyObject:
 
 
 	def mymethod():
-		self.x = false
+		self.x = 5
 
 	def _++%%(MyObject other) returns MyObject:
-		return MyObject()
+		return MyObject(1, 5.0)
 
 
 """
@@ -510,7 +525,7 @@ class MyObject:
 
 
 	def mymethod():
-		self.x = false
+		self.x = 10
 
 
 
@@ -519,7 +534,7 @@ class MyObject:
 
 
 	def _++%%(MyObject other) returns MyObject:
-		return MyObject()
+		return MyObject(1, 5.0, false)
 	def mymethod2(int x) returns int:
 		return 5
 """
@@ -530,7 +545,7 @@ class MyObject:
 class MyObject:
 	def _++%%(MyObject other) returns MyObject:
 		return MyObject()
-	def mymethod2(int x):
+	def mymethod2(int x) returns int:
 		return 5
 """
     self.assertProgramPasses(program)
@@ -617,7 +632,7 @@ loop while x<100:
 
   def test_valid_returns_succeeds(self):
     program = b'''
-def my_func() returns int:
+def my_func(int x) returns int:
 	if x > 5:
 		println("hey")
 	else:
@@ -661,9 +676,37 @@ x = -x
 '''
     self.assertProgramPasses(program)
 
-  def test_valid_returns_succeeds(self):
+  def test_valid_self_return_succeeds(self):
     program = b'''
+class MyClass:
+	def foo() returns MyClass:
+		return self
+'''
+    self.assertProgramPasses(program)
 
+  def test_constructor_overwriting_is_allowed(self):
+    program = b'''
+class MyClass:
+	required:
+		int x
+	def construct(int x):
+		println("i am overwriting the default constructor")
+
+'''
+    self.assertProgramPasses(program)
+
+  def test_assigning_to_array_index_succeeds(self):
+    program = b'''
+string[3] arr = ["one", "two", "three"]
+arr[1] = "newvalue"
+arr[1]
+'''
+    self.assertProgramPasses(program)
+
+  def test_array_update_succeeds(self):
+    program = b'''
+int[2] arr = [1, 2]
+arr[0] += 5
 '''
     self.assertProgramPasses(program)
 
@@ -929,6 +972,39 @@ def myfunc(string x) returns int:
   return 5
 
 myfunc(5)
+"""
+    self.assertProgramFails(program)
+
+  def test_invalid_self_return_fails(self):
+    program = b"""
+class MyClass:
+	def foo() returns int:
+		return self
+"""
+
+  def test_self_on_its_own_fails(self):
+    program = b"""self\n"""
+    self.assertProgramFails(program)
+
+  def test_self_as_identifier_fails(self):
+    program = b"""
+int self = 5
+self
+"""
+    self.assertProgramFails(program)
+
+  def test_constructors_must_not_have_returns(self):
+    program = b"""
+class MyClass:
+	def construct() returns int:
+		return 5
+"""
+    self.assertProgramFails(program)
+
+  def test_bad_array_assign_fails(self):
+    program = b"""
+string[3] arr = ["one", "two", "three"]
+arr[1] = 50.0
 """
     self.assertProgramFails(program)
 

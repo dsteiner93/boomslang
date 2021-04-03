@@ -11,25 +11,27 @@ and sx =
 | SStringLiteral of string
 | SBoolLiteral of bool
 | SId of string
+| SSelf
 | SNullExpr
 | SCall of scall
 | SObjectInstantiation of string * sexpr list
 | SObjectVariableAccess of object_variable_access
-| SArrayAccess of string * sexpr
+| SArrayAccess of sarray_access
 | SArrayLiteral of sexpr list
 | SBinop of sexpr * binop * sexpr
 | SUnop of unaryop * sexpr
 | SAssign of sassign
 | SUpdate of supdate
+and sarray_access = string * sexpr
 and scall =
   SFuncCall of string * sexpr list
 | SMethodCall of string * string * sexpr list
 and sassign =
   SRegularAssign of typ * string * sexpr
-| SObjectVariableAssign of object_variable_access * sexpr
 and supdate =
   SRegularUpdate of string * updateop * sexpr
 | SObjectVariableUpdate of object_variable_access * updateop * sexpr
+| SArrayAccessUpdate of sarray_access * updateop * sexpr
 
 type sstmt =
   SExpr of sexpr
@@ -106,15 +108,21 @@ let rec string_of_sexpr existing_suffix new_index sexpr =
 | SBoolLiteral(b) -> ("boollit" ^ suffix, [get_literal_node "boollit" suffix (string_of_bool b)])
 | SId(id_string) -> string_of_id_typ suffix 0 id_string typ
 | SNullExpr -> ("nullexpr" ^ suffix, [get_literal_node "nullexpr" suffix "NULL"])
+| SSelf -> string_of_id_typ suffix 0 "self" typ
 | SCall(scall) -> string_of_scall typ suffix 0 scall
 | SObjectInstantiation(id_string, sexprs) -> combine_list_typ "object_instantiation" suffix ([string_of_id_typ suffix 0 id_string typ] @ (mapiplus 1 (string_of_sexpr suffix) sexprs)) typ
 | SObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
-| SArrayAccess(id_string, sexpr) -> combine_list_typ "array_access" suffix ([string_of_id_typ suffix 0 id_string typ] @ [string_of_sexpr suffix 1 sexpr]) typ
+| SArrayAccess(sarray_access) -> string_of_sarray_access suffix 0 sarray_access typ
 | SArrayLiteral(sexprs) -> get_multi_node_generator_typ "array_literal" suffix string_of_sexpr sexprs typ
 | SBinop(sexpr1, binop, sexpr2) -> combine_list_typ "binop" suffix ([string_of_sexpr suffix 0 sexpr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_sexpr suffix 2 sexpr2]) typ
 | SUnop(unaryop, sexpr) -> combine_list_typ "unaryop" suffix ([string_of_unaryop suffix 0 unaryop] @ [string_of_sexpr suffix 1 sexpr]) typ
 | SAssign(sassign) -> string_of_sassign suffix 0 sassign
 | SUpdate(supdate) -> string_of_supdate typ suffix 0 supdate
+and string_of_sarray_access existing_suffix new_index sarray_access typ =
+  let suffix = new_suffix existing_suffix new_index in
+  let id_string = (fst sarray_access) in
+  let sexpr = (snd sarray_access) in
+  combine_list_typ "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_sexpr suffix 1 sexpr]) typ
 and string_of_scall typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -124,12 +132,12 @@ and string_of_sassign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   SRegularAssign(typ, id_string, sexpr) -> combine_list_typ "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_sexpr suffix 3 sexpr]) (fst sexpr)
-| SObjectVariableAssign(object_variable_access, sexpr) -> combine_list_typ "assign" suffix ([string_of_object_variable_access suffix 1 object_variable_access] @ [string_of_sexpr suffix 1 sexpr]) (fst sexpr)
 and string_of_supdate typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   SRegularUpdate(id_string, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_id_typ suffix 0 id_string typ] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
 | SObjectVariableUpdate(object_variable_access, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_object_variable_access suffix 0 object_variable_access] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
+| SArrayAccessUpdate(sarray_access, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_sarray_access suffix 0 sarray_access typ] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
 
 let rec string_of_sstmt existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in

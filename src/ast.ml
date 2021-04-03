@@ -1,10 +1,10 @@
 type primitive = Int | Long | Float | Char | String | Bool | Void
 
-type binop = Plus | Subtract | Times | Divide | Modulo | DoubleEq | NotEq | BoGT | BoLT | BoGTE | BoLTE | BoOr | BoAnd
+type binop = Plus | Subtract | Times | Divide | Modulo | DoubleEq | BoGT | BoLT | BoGTE | BoLTE | BoOr | BoAnd
 
 type unaryop = Not | Neg
 
-type updateop = Eq | PlusEq | MinusEq | TimesEq | DivideEq
+type updateop = Eq
 
 type typ = 
   Primitive of primitive
@@ -24,25 +24,27 @@ type expr =
 | StringLiteral of string
 | BoolLiteral of bool
 | Id of string
+| Self
 | NullExpr
 | Call of call
 | ObjectInstantiation of string * expr list
 | ObjectVariableAccess of object_variable_access
-| ArrayAccess of string * expr
+| ArrayAccess of array_access
 | ArrayLiteral of expr list
 | Binop of expr * binop * expr
 | Unop of unaryop * expr
 | Assign of assign
 | Update of update
+and array_access = string * expr
 and call =
   FuncCall of string * expr list (* my_func(1, 2, 3) *)
 | MethodCall of string * string * expr list (* object.identifier(params) *)
 and assign =
   RegularAssign of typ * string * expr
-| ObjectVariableAssign of object_variable_access * expr
 and update =
   RegularUpdate of string * updateop * expr
 | ObjectVariableUpdate of object_variable_access * updateop * expr
+| ArrayAccessUpdate of array_access * updateop * expr
 
 type stmt =
   Expr of expr
@@ -143,15 +145,21 @@ and string_of_expr existing_suffix new_index =
 | BoolLiteral(b) -> ("boollit" ^ suffix, [get_literal_node "boollit" suffix (string_of_bool b)])
 | Id(id_string) -> string_of_id suffix 0 id_string
 | NullExpr -> ("nullexpr" ^ suffix, [get_literal_node "nullexpr" suffix "NULL"])
+| Self -> string_of_id suffix 0 "self"
 | Call(call) -> string_of_call suffix 0 call
 | ObjectInstantiation(id_string, exprs) -> combine_list "object_instantiation" suffix ([string_of_id suffix 0 id_string] @ (mapiplus 1 (string_of_expr suffix) exprs))
 | ObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
-| ArrayAccess(id_string, expr) -> combine_list "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_expr suffix 1 expr])
+| ArrayAccess(array_access) -> string_of_array_access suffix 0 array_access
 | ArrayLiteral(exprs) -> get_multi_node_generator "array_literal" suffix string_of_expr exprs
 | Binop(expr1, binop, expr2) -> combine_list "binop" suffix ([string_of_expr suffix 0 expr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_expr suffix 2 expr2])
 | Unop(unaryop, expr) -> combine_list "unaryop" suffix ([string_of_unaryop suffix 0 unaryop] @ [string_of_expr suffix 1 expr])
 | Assign(assign) -> string_of_assign suffix 0 assign
 | Update(update) -> string_of_update suffix 0 update
+and string_of_array_access existing_suffix new_index array_access =
+  let suffix = new_suffix existing_suffix new_index in
+  let id_string = (fst array_access) in
+  let expr = (snd array_access) in
+  combine_list "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_expr suffix 1 expr])
 and string_of_call existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -161,12 +169,12 @@ and string_of_assign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   RegularAssign(typ, id_string, expr) -> combine_list "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_expr suffix 3 expr])
-| ObjectVariableAssign(object_variable_access, expr) -> combine_list "assign" suffix ([string_of_object_variable_access suffix 1 object_variable_access] @ [string_of_expr suffix 1 expr])
 and string_of_update existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   RegularUpdate(id_string, updateop, expr) -> combine_list "update" suffix ([string_of_id suffix 0 id_string] @ [string_of_updateop suffix 1 updateop] @ [string_of_expr suffix 2 expr])
 | ObjectVariableUpdate(object_variable_access, updateop, expr) -> combine_list "update" suffix ([string_of_object_variable_access suffix 0 object_variable_access] @ [string_of_updateop suffix 1 updateop] @ [string_of_expr suffix 2 expr])
+| ArrayAccessUpdate(array_access, updateop, expr) -> combine_list "update" suffix ([string_of_array_access suffix 0 array_access] @ [string_of_updateop suffix 1 updateop] @ [string_of_expr suffix 2 expr])
 and string_of_binoperator existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -176,7 +184,6 @@ and string_of_binoperator existing_suffix new_index =
 | Divide -> ("divide" ^ suffix, [get_op_node_label "divide" suffix "÷"])
 | Modulo -> ("modulo" ^ suffix, [get_op_node_label "modulo" suffix "%"])
 | DoubleEq -> ("doubleeq" ^ suffix, [get_op_node_label "doubleeq" suffix "=="])
-| NotEq -> ("noteq" ^ suffix, [get_op_node_label "noteq" suffix "!="])
 | BoGT -> ("gt" ^ suffix, [get_op_node_label "gt" suffix ">"])
 | BoLT -> ("lt" ^ suffix, [get_op_node_label "lt" suffix "<"])
 | BoGTE -> ("gte" ^ suffix, [get_op_node_label "gte" suffix ">="])
@@ -187,10 +194,6 @@ and string_of_updateop existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
 | Eq -> ("eq" ^ suffix, [get_op_node_label "eq" suffix "="])
-| PlusEq -> ("pluseq" ^ suffix, [get_op_node_label "pluseq" suffix "+="])
-| MinusEq -> ("minuseq" ^ suffix, [get_op_node_label "minuseq" suffix "-="])
-| TimesEq -> ("timeseq" ^ suffix, [get_op_node_label "timeseq" suffix "*="])
-| DivideEq -> ("divideeq" ^ suffix, [get_op_node_label "divideeq" suffix "/="])
 and string_of_unaryop existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function

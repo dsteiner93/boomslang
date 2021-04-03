@@ -103,32 +103,32 @@ params: /* these are the params used to invoke a function */
 
 classdecl:
   CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = []; methods = List.rev $6} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = []; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = []; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
+    INDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = List.rev $10; methods = List.rev $13} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = []; methods = List.rev $20} }
 | CLASS CLASS_NAME COLON NEWLINE
-    INDENT STATIC COLON NEWLINE INDENT regular_assigns NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
+    INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = List.rev $17; methods = List.rev $20} }
 | CLASS CLASS_NAME COLON NEWLINE
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT OPTIONAL COLON NEWLINE INDENT regular_assigns NEWLINE
+    DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
     DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = List.rev $17; methods = List.rev $20} }
 
 optional_fdecls:
@@ -146,27 +146,29 @@ vdecls:
 vdecl:
   typ IDENTIFIER { ($1, $2) }
 
-regular_assigns:
-  regular_assign { [$1] }
-| regular_assigns NEWLINE regular_assign { $3::$1 }
-
-regular_assign:
-  typ IDENTIFIER EQ expr { RegularAssign ($1, $2, $4) }
+assigns:
+  assign { [$1] }
+| assigns NEWLINE assign { $3::$1 }
 
 assign:
-  regular_assign { $1 }
-| object_variable_access EQ expr { ObjectVariableAssign ($1, $3) }
+  typ IDENTIFIER EQ expr { RegularAssign ($1, $2, $4) }
 
 assign_update:
   IDENTIFIER EQ expr { RegularUpdate ($1, Eq, $3) }
-| IDENTIFIER PLUS_EQ expr { RegularUpdate ($1, PlusEq, $3) }
-| IDENTIFIER MINUS_EQ expr { RegularUpdate ($1, MinusEq, $3) }
-| IDENTIFIER TIMES_EQ expr { RegularUpdate ($1, TimesEq, $3) }
-| IDENTIFIER DIVIDE_EQ expr { RegularUpdate ($1, DivideEq, $3) }
-| object_variable_access PLUS_EQ expr { ObjectVariableUpdate ($1, PlusEq, $3) }
-| object_variable_access MINUS_EQ expr { ObjectVariableUpdate ($1, MinusEq, $3) }
-| object_variable_access TIMES_EQ expr { ObjectVariableUpdate ($1, TimesEq, $3) }
-| object_variable_access DIVIDE_EQ expr { ObjectVariableUpdate ($1, DivideEq, $3) }
+| IDENTIFIER PLUS_EQ expr { RegularUpdate ($1, Eq, Binop(Id($1), Plus, $3)) }
+| IDENTIFIER MINUS_EQ expr { RegularUpdate ($1, Eq, Binop(Id($1), Subtract, $3)) }
+| IDENTIFIER TIMES_EQ expr { RegularUpdate ($1, Eq, Binop(Id($1), Times, $3)) }
+| IDENTIFIER DIVIDE_EQ expr { RegularUpdate ($1, Eq, Binop(Id($1), Divide, $3)) }
+| object_variable_access EQ expr { ObjectVariableUpdate ($1, Eq, $3) }
+| object_variable_access PLUS_EQ expr { ObjectVariableUpdate ($1, Eq, Binop(ObjectVariableAccess($1), Plus, $3)) }
+| object_variable_access MINUS_EQ expr { ObjectVariableUpdate ($1, Eq, Binop(ObjectVariableAccess($1), Subtract, $3)) }
+| object_variable_access TIMES_EQ expr { ObjectVariableUpdate ($1, Eq, Binop(ObjectVariableAccess($1), Times, $3)) }
+| object_variable_access DIVIDE_EQ expr { ObjectVariableUpdate ($1, Eq, Binop(ObjectVariableAccess($1), Divide, $3)) }
+| array_access EQ expr { ArrayAccessUpdate ($1, Eq, $3) }
+| array_access PLUS_EQ expr { ArrayAccessUpdate ($1, Eq, Binop(ArrayAccess($1), Plus, $3)) }
+| array_access MINUS_EQ expr { ArrayAccessUpdate ($1, Eq, Binop(ArrayAccess($1), Subtract, $3)) }
+| array_access TIMES_EQ expr { ArrayAccessUpdate ($1, Eq, Binop(ArrayAccess($1), Times, $3)) }
+| array_access DIVIDE_EQ expr { ArrayAccessUpdate ($1, Eq, Binop(ArrayAccess($1), Divide, $3)) }
 
 func_call:
   IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ($1, $3, List.rev $5) }
@@ -186,7 +188,7 @@ object_variable_access:
 | SELF PERIOD IDENTIFIER { ("self", $3) }
 
 array_access:
-  IDENTIFIER LBRACKET expr RBRACKET { ArrayAccess ($1, $3)}
+  IDENTIFIER LBRACKET expr RBRACKET { ($1, $3) }
 
 array_literal:
   LBRACKET params RBRACKET { ArrayLiteral (List.rev $2) }
@@ -212,11 +214,12 @@ expr:
 | STRING_LITERAL { StringLiteral $1 }
 | BOOLEAN_LITERAL { BoolLiteral $1 }
 | IDENTIFIER { Id $1 }
+| SELF { Self }
 | NULL { NullExpr }
 | func_call { Call $1 }
 | object_instantiation { $1 }
 | object_variable_access { ObjectVariableAccess $1 }
-| array_access { $1 }
+| array_access { ArrayAccess $1 }
 | array_literal { $1 }
 | LPAREN expr RPAREN { $2 }
 | expr PLUS expr { Binop ($1, Plus, $3) }
@@ -228,7 +231,7 @@ expr:
 | assign { Assign $1 }
 | assign_update { Update $1 }
 | expr DOUBLE_EQ expr { Binop ($1, DoubleEq, $3) }
-| expr NOT_EQ expr { Binop ($1, NotEq, $3) }
+| expr NOT_EQ expr { Unop (Not, Binop ($1, DoubleEq, $3)) }
 | expr GT expr { Binop ($1, BoGT, $3) }
 | expr LT expr { Binop ($1, BoLT, $3) }
 | expr GTE expr { Binop ($1, BoGTE, $3) }
