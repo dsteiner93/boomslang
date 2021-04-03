@@ -98,6 +98,12 @@ let coerceable_types = [
 let add_to_map map coerceable_type = LhsRhsMap.add (fst coerceable_type) (snd coerceable_type) map in
 let coerceable_types_map = List.fold_left add_to_map LhsRhsMap.empty coerceable_types
 in
+let type_is_nullable = function
+  Primitive(_) -> false
+| Class(_) -> true
+| Array(_, _) -> false
+| NullType -> true
+in
 
 (* First, figure out all the defined functions *)
 let get_signature fdecl = { fs_name = fdecl.fname; formal_types = List.map fst fdecl.formals }
@@ -239,7 +245,7 @@ check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
-  if rhs_type = lhs_type then
+  if (rhs_type = lhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
     ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
   else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
     let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
@@ -259,7 +265,8 @@ check_regular_update id updateop rhs_expr v_symbol_tables =
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   match updateop with
     Eq ->
-          if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, checked_expr)))
+          if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
+            (lhs_type, SUpdate (SRegularUpdate(id, updateop, checked_expr)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, (converter [checked_expr]))))
@@ -273,7 +280,8 @@ check_object_variable_update object_variable_access updateop rhs_expr v_symbol_t
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   match updateop with
     Eq ->
-          if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SObjectVariableUpdate(object_variable_access, updateop, checked_expr)))
+          if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
+            (lhs_type, SUpdate (SObjectVariableUpdate(object_variable_access, updateop, checked_expr)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SObjectVariableUpdate(object_variable_access, updateop, (converter [checked_expr]))))
@@ -288,7 +296,8 @@ check_array_access_update array_access updateop rhs_expr v_symbol_tables =
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   match updateop with
     Eq ->
-          if lhs_type = rhs_type then ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, checked_expr)))
+          if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
+            (lhs_type, SUpdate (SArrayAccessUpdate(sarray_access, updateop, checked_expr)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, (converter [checked_expr]))))

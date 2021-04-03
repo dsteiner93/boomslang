@@ -131,7 +131,7 @@ and string_of_scall typ existing_suffix new_index =
 and string_of_sassign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
-  SRegularAssign(typ, id_string, sexpr) -> combine_list_typ "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_sexpr suffix 3 sexpr]) (fst sexpr)
+  SRegularAssign(typ, id_string, sexpr) -> combine_list_typ "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_sexpr suffix 3 sexpr]) typ
 and string_of_supdate typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
