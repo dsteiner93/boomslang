@@ -49,6 +49,7 @@ let translate sp_units =
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
 
+  (* define the builder for the main block *) 
   let builder = L.builder_at_end context (L.entry_block main_func) in
 
   (* format strings for printf style of functions *)
@@ -57,30 +58,17 @@ let translate sp_units =
   and str_format_str =
     L.build_global_stringptr "%s\n" "fmt" builder in
 
-  
-  (*
-  let get_the_string = function
-    SStmt(SExpr(_, SCall(SFuncCall(fname, (_, SStringLiteral(sliteral))::tl1))))::tl2 -> 
-        sliteral
-    | _ -> raise (Failure("Unimplemented"))
+  let rec build_expr (exp : sexpr) = match exp with
+    _, SIntLiteral(i)      -> L.const_int i32_t i
+  | _, SStringLiteral(str) -> L.build_global_stringptr str "unused" builder
+  | typ, SCall(sc) -> match sc with
+      SFuncCall(func_name, expr_list) -> match func_name, expr_list with
+        "println", [e] -> L.build_call println_func [| str_format_str; (build_expr e) |] 
+                                       "" builder
   in
-  let get_the_ll_string = L.build_global_stringptr (get_the_string sp_units) "unused" builder in
-  let _ : L.llvalue =
-    L.build_call println_func [| str_format_str ; get_the_ll_string |] "" builder in
-  *)
-
-  (* add the return at the end of main *) 
-  let main_return : L.llvalue =
-    L.build_ret (L.const_int i32_t 0) builder in
-
-  let build_expr (exp : sexpr) = match exp with
-    typ, SCall(sc) -> match sc with
-      SFuncCall(func_name, expr_list) -> () 
-      | _                             -> ()
-  | _ -> () in
 
   let build_stmt  (ss : sstmt) = match ss with
-    SExpr(se)   -> build_expr se
+    SExpr(se)   -> ignore (build_expr se)
   | _           -> () in
 
   let build_func  (sf : sfdecl) = () in 
@@ -88,9 +76,10 @@ let translate sp_units =
   let build_class (sc : sclassdecl) = () in
 
   let build_program (spunit : sp_unit) = match spunit with
-    SStmt(ss)       -> build_stmt  ss
-  | SFdecl(sf)      -> build_func  sf
+    SStmt(ss)       -> build_stmt ss
+  | SFdecl(sf)      -> build_func sf
   | SClassdecl(sc)  -> build_class sc in
   
   List.iter build_program sp_units; 
+  L.build_ret (L.const_int i32_t 0) builder; (* build return for main *)
   the_module
