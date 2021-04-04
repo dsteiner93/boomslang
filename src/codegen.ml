@@ -49,37 +49,42 @@ let translate sp_units =
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
 
-  (* define the builder for the main block *) 
-  let builder = L.builder_at_end context (L.entry_block main_func) in
-
   (* format strings for printf style of functions *)
+  (*
   let int_format_str =
     L.build_global_stringptr "%d\n" "fmt" builder
   and str_format_str =
     L.build_global_stringptr "%s\n" "fmt" builder in
+  *)
 
-  let rec build_expr (exp : sexpr) = match exp with
+  let str_format_str builder =
+   L.build_global_stringptr "%s\n" "fmt" builder in
+
+  let rec build_expr builder (exp : sexpr) = match exp with
     _, SIntLiteral(i)      -> L.const_int i32_t i
   | _, SStringLiteral(str) -> L.build_global_stringptr str "unused" builder
   | typ, SCall(sc) -> match sc with
       SFuncCall(func_name, expr_list) -> match func_name, expr_list with
-        "println", [e] -> L.build_call println_func [| str_format_str; (build_expr e) |] 
-                                       "" builder
+        "println", [e] -> L.build_call println_func [| (str_format_str builder); 
+                          (build_expr builder e) |] "" builder
   in
 
-  let build_stmt  (ss : sstmt) = match ss with
-    SExpr(se)   -> ignore (build_expr se)
+  let build_stmt  builder (ss : sstmt) = match ss with
+    SExpr(se)   -> ignore (build_expr builder se)
   | _           -> () in
 
   let build_func  (sf : sfdecl) = () in 
 
   let build_class (sc : sclassdecl) = () in
+  
+  (* define the builder for the main block *) 
+  let main_builder = L.builder_at_end context (L.entry_block main_func) in
 
   let build_program (spunit : sp_unit) = match spunit with
-    SStmt(ss)       -> build_stmt ss
+    SStmt(ss)       -> build_stmt main_builder ss
   | SFdecl(sf)      -> build_func sf
   | SClassdecl(sc)  -> build_class sc in
-  
+     
   List.iter build_program sp_units; 
-  L.build_ret (L.const_int i32_t 0) builder; (* build return for main *)
+  L.build_ret (L.const_int i32_t 0) main_builder; (* build return for main *)
   the_module
