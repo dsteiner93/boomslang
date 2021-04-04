@@ -204,7 +204,6 @@ typ:
 | VOID { Primitive Void }
 | CLASS_NAME { Class $1 }
 | typ LBRACKET INT_LITERAL RBRACKET { Array ($1, $3) }
-| typ LBRACKET RBRACKET { Array ($1, -1) }
 
 expr:
   INT_LITERAL { IntLiteral $1 }
