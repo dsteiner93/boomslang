@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Regression testing script for MicroC
+# Regression testing script for Boomslang(stolen from microc)
 # Step through a list of files
 #  Compile, run, and check the output of each expected-to-work test
 #  Compile and check the error of each expected-to-fail test
@@ -16,10 +16,6 @@ LLC="llc"
 # Path to the C compiler
 CC="cc"
 
-# Path to the microc compiler.  Usually "./microc.native"
-# Try "_build/microc.native" if ocamlbuild was unable to create a symbolic link.
-#MICROC="./microc.native"
-#MICROC="_build/microc.native"
 BOOMC="./boomslang.native"
 BOOMCEXEC="./boomc"
 
