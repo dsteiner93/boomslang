@@ -44,7 +44,7 @@ clean :
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
         repl.out repl a.out __pycache__ _build boomslang.native \
-	*.ll *.exe *.s
+	*.ll *.exe *.s *.o
 
 TARFILES = README.md Makefile \
 	scanner.mll parser.mly ast.ml sast.ml semant.ml \

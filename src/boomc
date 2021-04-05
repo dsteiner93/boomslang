@@ -23,7 +23,8 @@ make clean
 make
 ./boomslang.native $input_file > $ll_file
 llc -relocation-model=pic $ll_file > $s_file
-cc -o $exe_file $s_file
+gcc -c println.c int_to_string.c
+cc -o $exe_file $s_file println.o int_to_string.o
 
 if [ "$should_execute" = true ];
 then
