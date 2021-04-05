@@ -1,0 +1,2 @@
+def println() returns int:
+	return 0
