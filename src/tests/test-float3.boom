@@ -1,0 +1,20 @@
+def testfloat(float a, float b) returns void:
+	println(a + b)
+	println(a - b)
+	println(a * b)
+	println(a / b)
+	println(a == b)
+	println(a == a)
+	println(a != b)
+	println(a != a)
+	println(a > b)
+	println(a >= b)
+	println(a < b)
+	println(a <= b)
+
+float c
+float d
+c = 42.0
+d = 3.14159
+testfloat(c, d)
+testfloat(d, d)
