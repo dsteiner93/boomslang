@@ -14,9 +14,11 @@ http://llvm.moe/ocaml/
 
 module L = Llvm
 module A = Ast
+module S = Semant
 open Sast 
 
 module StringMap = Map.Make(String)
+module SignatureMap = Map.Make(struct type t = S.function_signature let compare = compare end)
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
@@ -35,10 +37,24 @@ let translate sp_units =
 
   (* Return the LLVM type for a Boomslang type *)
   let ltype_of_typ = function
-     A.Int    -> i32_t
-  |  _        -> void_t
+     A.Primitive(Int)    -> i32_t
+  |  A.Primitive(Void)   -> void_t
+  |  A.Primitive(String) -> str_t
+  |  _                   -> void_t
   in
 
+  (* create a map of all of the built in functions *)
+  let built_in_map =
+   let built_in_funcs : (string * A.typ * (A.typ list)) list = [
+     ("println", A.Primitive(Void), [A.Primitive(String)])
+   ] in
+   let helper m e = match e with fun_name, ret_t, arg_ts -> 
+       let arg_t_arr = Array.of_list (List.fold_left (fun s e -> s @ [ltype_of_typ e]) 
+                    [] arg_ts) in
+    SignatureMap.add { S.fs_name = fun_name; S.formal_types = arg_ts }
+                      (L.var_arg_function_type (ltype_of_typ ret_t) arg_t_arr) m in
+   List.fold_left helper SignatureMap.empty built_in_funcs in
+    
   (* define the built-in println function *)
   let println_t : L.lltype = L.var_arg_function_type i32_t [| L.pointer_type i8_t |] in
   let println_func : L.llvalue = L.declare_function "printf" println_t the_module in
@@ -48,14 +64,6 @@ let translate sp_units =
       L.var_arg_function_type i32_t [| |] in
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
-
-  (* format strings for printf style of functions *)
-  (*
-  let int_format_str =
-    L.build_global_stringptr "%d\n" "fmt" builder
-  and str_format_str =
-    L.build_global_stringptr "%s\n" "fmt" builder in
-  *)
 
   let str_format_str builder =
    L.build_global_stringptr "%s\n" "fmt" builder in
