@@ -62,6 +62,21 @@ let translate sp_units =
   let rec build_expr builder (exp : sexpr) = match exp with
     _, SIntLiteral(i)      -> L.const_int i32_t i
   | _, SStringLiteral(str) -> L.build_global_stringptr str "unused" builder
+  | _, SBinop(sexpr1, binop, sexpr2) -> 
+        let sexpr1' = build_expr builder sexpr1
+        and sexpr2' = build_expr builder sexpr2 in
+        (match binop with
+          A.Plus         -> L.build_add
+        | A.Subtract     -> L.build_sub
+        | A.Times        -> L.build_mul
+        | A.Divide       -> L.build_sdiv (*signed division*)
+        | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (*ordered and greater than*)
+        | A.BoLT         -> L.build_fcmp L.Fcmp.Olt (*ordered and less than*)
+        | A.BoGTE        -> L.build_fcmp L.Fcmp.Oge (*etc.*)
+        | A.BoLTE        -> L.build_fcmp L.Fcmp.Ole 
+        | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (*ordered and equal to*)
+        (*A.Modulo       -> TODO*)  ) sexpr1' sexpr2' "tmp" builder 
+        (*"L.build sexpr1' sexpr2' "tmp" 'builder'"? I need to understand LLVM syntax*)
   | typ, SCall(sc) -> match sc with
       SFuncCall(func_name, expr_list) -> 
        let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
@@ -73,7 +88,7 @@ let translate sp_units =
              (if typ = Primitive(Void) then "" else (func_name ^ "_res"))
              builder
        else L.const_int i32_t 0 (* TODO: this is a placeholder! *)
-  in
+   in
 
   (* statement builder *) 
   let build_stmt  builder (ss : sstmt) = match ss with
