@@ -1,3 +1,2 @@
-float a
-a = 3.14159267
+float a = 3.14159267
 println(a)
