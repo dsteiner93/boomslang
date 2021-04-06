@@ -1,0 +1,5 @@
+def foo(int a) returns void:
+	println(a + 3)
+	return
+
+foo(40)

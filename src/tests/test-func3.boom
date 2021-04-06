@@ -1,0 +1,7 @@
+def printem(int a, int b, int c, int d) returns void:
+	println(a)
+	println(b)
+	println(c)
+	println(d)
+
+printem(42,17,192,8)
