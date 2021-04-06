@@ -592,7 +592,13 @@ check_stmt_list v_symbol_tables expected_rtype = function
 | [Return(_) as s] -> [check_stmt v_symbol_tables expected_rtype s]
 | ReturnVoid :: _ -> raise (Failure("Nothing can follow a return statement"))
 | Return(_) :: _ -> raise (Failure("Nothing can follow a return statement"))
-| s :: stmt_list -> check_stmt v_symbol_tables expected_rtype s :: check_stmt_list v_symbol_tables expected_rtype stmt_list
+| s :: stmt_list ->
+    (* This let is neeeded to ensure the first statement is evaluated
+       before the rest of the statements in the list. Our language is
+       sequential from top to bottom but by default OCaml has :: as
+       right associative *)
+    let fst_stmt = check_stmt v_symbol_tables expected_rtype s in
+    fst_stmt :: check_stmt_list v_symbol_tables expected_rtype stmt_list
 | [] -> []
 and
 
