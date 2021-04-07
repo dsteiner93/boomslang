@@ -1,0 +1,4 @@
+def add(int x, int y) returns int:
+	return x + y
+
+println(add(17, 25))

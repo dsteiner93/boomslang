@@ -1,0 +1,5 @@
+def add(int a, int b) returns int:
+	return a + b
+
+int a = add(39, 3)
+println(a)

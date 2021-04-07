@@ -1,0 +1,6 @@
+def foo(int a) returns int:
+	return a
+
+int a = 42
+a = a + 5
+println(a)

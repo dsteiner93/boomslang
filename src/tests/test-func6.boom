@@ -1,0 +1,4 @@
+def bar(int a, boolean b, int c) returns int:
+	return a + c
+
+println(bar(17, false, 25))

@@ -1,0 +1,6 @@
+def add(int a, int b) returns int:
+	int c = a + b
+	return c
+
+int d = add(52, 10)
+println(d)

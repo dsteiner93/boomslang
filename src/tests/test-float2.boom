@@ -1,0 +1,4 @@
+float a = 3.14159267
+float b = -2.71828
+float c = a + b
+println(c)
