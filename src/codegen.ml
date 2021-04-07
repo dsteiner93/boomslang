@@ -70,11 +70,11 @@ let translate sp_units =
         | A.Subtract     -> L.build_sub
         | A.Times        -> L.build_mul
         | A.Divide       -> L.build_sdiv (*signed division*)
-        | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (*ordered and greater than*)
-        | A.BoLT         -> L.build_fcmp L.Fcmp.Olt (*ordered and less than*)
-        | A.BoGTE        -> L.build_fcmp L.Fcmp.Oge (*etc.*)
-        | A.BoLTE        -> L.build_fcmp L.Fcmp.Ole 
-        | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (*ordered and equal to*)
+        | A.BoGT         -> L.build_icmp L.Icmp.Sgt (*ordered and greater than*)
+        | A.BoLT         -> L.build_icmp L.Icmp.Slt (*ordered and less than*)
+        | A.BoGTE        -> L.build_icmp L.Icmp.Sge (*etc.*)
+        | A.BoLTE        -> L.build_icmp L.Icmp.Sle 
+        | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (*ordered and equal to*)
         (*A.Modulo       -> TODO*)  ) sexpr1' sexpr2' "tmp" builder 
         (*"L.build sexpr1' sexpr2' "tmp" 'builder'"? I need to understand LLVM syntax*)
   | typ, SCall(sc) -> match sc with

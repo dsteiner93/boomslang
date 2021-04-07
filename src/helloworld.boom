@@ -1,1 +1,8 @@
 println("Hello, world! Welcome to Boomslang.")
+println("A second line is working! Thanks Nathan!")
+println("this should show 6 below:")
+println(1+1+4)
+println("6 again:")
+println(2+2+2)
+println("6 again:")
+println(9-3)
