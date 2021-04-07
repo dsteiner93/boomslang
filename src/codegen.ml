@@ -77,6 +77,21 @@ let translate sp_units =
         | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (*ordered and equal to*)
         (*A.Modulo       -> TODO*)  ) sexpr1' sexpr2' "tmp" builder 
         (*"L.build sexpr1' sexpr2' "tmp" 'builder'"? I need to understand LLVM syntax*)
+  (*| A.Float, SBinop (sexpr1, binop, sexpr) -> 
+        let sexpr1' = build_expr builder sexpr1
+        and sexpr2' = build_expr builder sexpr2 in
+        (match binop with
+          A.Plus         -> L.build_fadd
+        | A.Subtract     -> L.build_fsub
+        | A.Times        -> L.build_fmul
+        | A.Divide       -> L.build_fdiv
+        | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (*ordered and greater than*)
+        | A.BoLT         -> L.build_fcmp L.Fcmp.Olt (*ordered and less than*)
+        | A.BoGTE        -> L.build_fcmp L.Fcmp.Oge (*etc.*)
+        | A.BoLTE        -> L.build_fcmp L.Fcmp.Ole 
+        | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (*ordered and equal to*)
+        (*A.Modulo       -> TODO*)  ) sexpr1' sexpr2' "tmp" builder *)
+        (*"L.build sexpr1' sexpr2' "tmp" 'builder'"? I need to understand LLVM syntax*)
   | typ, SCall(sc) -> match sc with
       SFuncCall(func_name, expr_list) -> 
        let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
