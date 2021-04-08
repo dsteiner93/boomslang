@@ -248,9 +248,25 @@ let translate sp_units =
   | _ -> raise (Failure("unimplemented expr in codegen"))
   in
 
+  (*let add_terminal builder instr =
+    match L.block_terminator (L.insertion_block builder) with
+Some _ -> ()
+    | None -> ignore (instr builder) in*)
   (* statement builder *) 
   let build_stmt builder v_symbol_tables (ss : sstmt) = match ss with
     SExpr(se)   -> ignore (build_expr builder v_symbol_tables se)
+  | SIf (predicate, then_stmt, elif_stmt, else_stmt) ->
+    let bool_val = build_expr builder v_symbol_tables predicate in
+    let merge_bb = L.append_block context "merge" main_program in
+    let b_br_merge = L.build_br merge_bb in
+    let then_bb = L.append_block context "then" main_program in
+    add_terminal (stmt (L.builder_at_end context then_bb) then_stmt) b_br_merge;
+    let elif_bb = L.append_block context "elif" main_program in
+    add_terminal (stmt (L.builder_at_end context elif_bb) elif_stmt) b_br_merge;
+    let else_bb = L.append_block context "else" main_program in
+    add_terminal (stmt (L.builder_at_end context context else_bb) else_stmt) b_br_merge;
+    ignore(L.build_cond_br bool_val then_bb else_bb builder);
+    L.builder_at_end context merge_bb
   | _           -> () in
 
   (* function decleration builder *) 
