@@ -22,6 +22,19 @@ module StringHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end);;
 
+let built_in_funcs = [
+  ({ fs_name = "println"; formal_types = [Primitive(String)] }, Primitive(Void));
+  ({ fs_name = "int_to_string"; formal_types = [Primitive(Int)] }, Primitive(String));
+  ({ fs_name = "long_to_string"; formal_types = [Primitive(Long)] }, Primitive(String));
+  ({ fs_name = "float_to_string"; formal_types = [Primitive(Float)] }, Primitive(String));
+  ({ fs_name = "char_to_string"; formal_types = [Primitive(Char)] }, Primitive(String));
+  ({ fs_name = "bool_to_string"; formal_types = [Primitive(Bool)] }, Primitive(String));
+  ({ fs_name = "int_to_long"; formal_types = [Primitive(Int)] }, Primitive(Long));
+  ({ fs_name = "int_to_float"; formal_types = [Primitive(Int)] }, Primitive(Float));
+  ({ fs_name = "concat_strings"; formal_types = [Primitive(String); Primitive(String)] }, Primitive(String)); 
+  ({ fs_name = "compare_strings"; formal_types = [Primitive(String); Primitive(String)] }, Primitive(Bool));
+]
+
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong. *)
 
@@ -57,17 +70,6 @@ let get_hash_of_binds bind_list =
   (List.iter (add_to_hash hash) bind_list); hash
 in
 
-let built_in_funcs = [
-  ({ fs_name = "println"; formal_types = [Primitive(String)] }, Primitive(Void));
-  ({ fs_name = "int_to_string"; formal_types = [Primitive(Int)] }, Primitive(String));
-  ({ fs_name = "long_to_string"; formal_types = [Primitive(Long)] }, Primitive(String));
-  ({ fs_name = "float_to_string"; formal_types = [Primitive(Float)] }, Primitive(String));
-  ({ fs_name = "char_to_string"; formal_types = [Primitive(Char)] }, Primitive(String));
-  ({ fs_name = "bool_to_string"; formal_types = [Primitive(Bool)] }, Primitive(String));
-  ({ fs_name = "int_to_long"; formal_types = [Primitive(Int)] }, Primitive(Long));
-  ({ fs_name = "int_to_float"; formal_types = [Primitive(Int)] }, Primitive(Float));
-]
-in
 let add_built_in map built_in = SignatureMap.add (fst built_in) (snd built_in) map
 in
 let built_in_func_map = List.fold_left add_built_in SignatureMap.empty built_in_funcs

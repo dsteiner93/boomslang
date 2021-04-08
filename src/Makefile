@@ -43,8 +43,8 @@ clean :
 	rm -rf ocamlllvm *.diff
 	rm -rf \
 	*.cmi *.cmo parser.ml parser.mli parser.output scanner.ml \
-        repl.out repl a.out __pycache__ _build boomslang.native \
-	*.ll *.exe *.s *.o
+        repl.out repl *.out __pycache__ _build boomslang.native \
+	*.ll *.exe *.s *.o testall.log
 
 TARFILES = README.md Makefile \
 	scanner.mll parser.mly ast.ml sast.ml semant.ml \
@@ -54,5 +54,8 @@ TARFILES = README.md Makefile \
 zip :
 	zip boomslang $(TARFILES)
 
-test :
+make test :
+	./testall.sh
+
+make pythontest :
 	python3 -m unittest run_tests

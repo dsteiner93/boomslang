@@ -1,0 +1,111 @@
+# Test printing
+println(NULL)
+println(true)
+println(false)
+println(50L)
+println(2.2)
+println(2)
+println("hello")
+println('c')
+println("hello"+'c')
+println(true+"hello")
+println(1+"hello")
+println(2.2+"hello")
+println("hello"+5L)
+println("hello"+NULL)
+println("hello"+"world")
+println(("hello " + NULL) + ("! 2+2" + " is equal to ") + (2+2))
+/# test multiline comments
+
+get totally ignored
+
+because i am just writing nonsense here
+
+""" to test#/
+# Test unops
+println(not true)
+println(not false)
+println(not (3 > 2))
+println(-2)
+println(-2.2)
+println(-5L)
+# Int section
+println(2+2)
+println(5-2)
+println(5*5)
+println(100/10)
+println(5%2)
+println(5 == 5)
+println(5 != 5)
+println(2 > 5)
+println(2 < 5)
+println(3 >= 2)
+println(3 <= 2)
+# Long section
+println(2L+2L)
+println(5L-2L)
+println(5L*5L)
+println(100L/10L)
+println(5L%2L)
+println(5L == 5L)
+println(5L != 5L)
+println(2L > 5L)
+println(2L < 5L)
+println(3L >= 2L)
+println(3L <= 2L)
+# Float section
+println(2.0+2.0)
+println(5.0-2.0)
+println(5.0*5.0)
+println(100.0/10.0)
+println(5.0 % 2.0)
+println(5.0 == 5.0)
+println(5.0 != 5.0)
+println(2.0 > 5.0)
+println(2.0 < 5.0)
+println(3.0 >= 2.0)
+println(3.0 <= 2.0)
+# Mixed section
+println(5.5 < 10.10)
+println(2 < 5.5)
+println(2 < 5L)
+println(true or false)
+println(true and true)
+println(true and false)
+println(false or false)
+println((2 < 5L) and (5.0 > 1))
+println(not not (true and false))
+println("hello" + "world" + "we" + "are" + "boomslang")
+# Test overflows
+println(5000000000 + 5000000000)
+println(5000000000L + 5000000000L)
+# Test equality
+int x = 1
+println("batch1")
+println(x == NULL)
+println("hello" == "HELLO")
+println("hello" == "hello")
+println(NULL == NULL)
+println(NULL != NULL)
+println("batch2")
+println(NULL != 0.0)
+println(0 == NULL)
+println(false == NULL)
+println(true == NULL)
+println(0L == NULL)
+println("batch3")
+println('a' == 'a')
+println('a' != 'b')
+println('a' != 'a')
+println('c' == NULL)
+println('c' == "c")  # this is true due to coercion
+
+# Test some crazy stuff
+int i = (int x = 5)
+println(i)
+println(x)
+
+int a = 5
+int b = (a = 1)
+println(a)
+println(b)

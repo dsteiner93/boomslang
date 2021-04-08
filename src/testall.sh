@@ -5,6 +5,10 @@
 #  Compile, run, and check the output of each expected-to-work test
 #  Compile and check the error of each expected-to-fail test
 
+# First, make the compiler and compile the libfuncs
+make
+gcc -c libfuncs.c
+
 # Path to the LLVM interpreter
 LLI="lli"
 #LLI="/usr/local/opt/llvm/bin/lli"
