@@ -1,0 +1,1 @@
+Fatal error: exception Failure("Found constructor that had rtype int rather than void.")

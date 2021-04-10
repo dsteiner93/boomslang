@@ -1,0 +1,2 @@
+int self = 5
+self

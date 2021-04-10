@@ -986,32 +986,6 @@ class MyClass:
 		return self
 """
 
-  def test_self_on_its_own_fails(self):
-    program = b"""self\n"""
-    self.assertProgramFails(program)
-
-  def test_self_as_identifier_fails(self):
-    program = b"""
-int self = 5
-self
-"""
-    self.assertProgramFails(program)
-
-  def test_constructors_must_not_have_returns(self):
-    program = b"""
-class MyClass:
-	def construct() returns int:
-		return 5
-"""
-    self.assertProgramFails(program)
-
-  def test_bad_array_assign_fails(self):
-    program = b"""
-string[3] arr = ["one", "two", "three"]
-arr[1] = 50.0
-"""
-    self.assertProgramFails(program)
-
 
 if __name__ == '__main__':
     unittest.main()  

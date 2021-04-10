@@ -55,7 +55,7 @@ zip :
 	zip boomslang $(TARFILES)
 
 make test :
-	./testall.sh
+	../test/testall.sh
 
 make pythontest :
 	python3 -m unittest run_tests
