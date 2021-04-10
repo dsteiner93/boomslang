@@ -39,6 +39,10 @@ let translate sp_units =
      we will generate code *)
   let the_module = L.create_module context "Boomslang" in
 
+  let builder_table = (StringHash.create 10) in
+  let store_builder builder = StringHash.add builder_table "builder" builder in
+  let get_builder () = StringHash.find builder_table "builder" in
+
   (* Get types from the context *)
   let i1_t       = L.i1_type            context
   and i8_t       = L.i8_type            context
@@ -248,27 +252,49 @@ let translate sp_units =
   | _ -> raise (Failure("unimplemented expr in codegen"))
   in
 
-  (*let add_terminal builder instr =
+  let add_terminal builder instr =
     match L.block_terminator (L.insertion_block builder) with
 Some _ -> ()
-    | None -> ignore (instr builder) in*)
+    | None -> ignore (instr builder) in
   (* statement builder *) 
-  let build_stmt builder v_symbol_tables (ss : sstmt) = match ss with
-    SExpr(se)   -> ignore (build_expr builder v_symbol_tables se)
-  | SIf (predicate, then_stmt, elif_stmt, else_stmt) ->
+  let rec build_stmt the_function v_symbol_tables builder (ss : sstmt) = match ss with
+    SExpr(se)   -> ignore (build_expr builder v_symbol_tables se); builder
+  | SIf (predicate, then_stmts, [], []) ->
     let bool_val = build_expr builder v_symbol_tables predicate in
-    let merge_bb = L.append_block context "merge" main_program in
+    let merge_bb = L.append_block context "merge" the_function in
     let b_br_merge = L.build_br merge_bb in
-    let then_bb = L.append_block context "then" main_program in
-    add_terminal (stmt (L.builder_at_end context then_bb) then_stmt) b_br_merge;
-    let elif_bb = L.append_block context "elif" main_program in
-    add_terminal (stmt (L.builder_at_end context elif_bb) elif_stmt) b_br_merge;
-    let else_bb = L.append_block context "else" main_program in
-    add_terminal (stmt (L.builder_at_end context context else_bb) else_stmt) b_br_merge;
+    let then_bb = L.append_block context "then" the_function in
+    add_terminal (build_stmt_list the_function v_symbol_tables (L.builder_at_end context then_bb) then_stmts) b_br_merge;
+    ignore(L.build_cond_br bool_val then_bb merge_bb builder);
+    L.builder_at_end context merge_bb
+  | SIf (predicate, then_stmts, [], else_stmts) ->
+    let bool_val = build_expr builder v_symbol_tables predicate in
+    let merge_bb = L.append_block context "merge" the_function in
+    let b_br_merge = L.build_br merge_bb in
+    let then_bb = L.append_block context "then" the_function in
+    add_terminal (build_stmt_list the_function v_symbol_tables (L.builder_at_end context then_bb) then_stmts) b_br_merge;
+    let else_bb = L.append_block context "else" the_function in
+    add_terminal (build_stmt_list the_function v_symbol_tables (L.builder_at_end context else_bb) else_stmts) b_br_merge;
     ignore(L.build_cond_br bool_val then_bb else_bb builder);
     L.builder_at_end context merge_bb
-  | _           -> () in
-
+  | SIf (predicate, then_stmts, elif_stmts, else_stmts) ->
+    let bool_val = build_expr builder v_symbol_tables predicate in
+    let merge_bb = L.append_block context "merge" the_function in
+    let b_br_merge = L.build_br merge_bb in
+    let then_bb = L.append_block context "then" the_function in
+    add_terminal (build_stmt_list the_function v_symbol_tables (L.builder_at_end context then_bb) then_stmts) b_br_merge;
+    let else_bb = L.append_block context "else" the_function in
+    let first_elif = List.hd elif_stmts in
+    let first_elif_predicate = fst first_elif in
+    let first_elif_stmts = snd first_elif in
+    add_terminal (build_stmt the_function v_symbol_tables (L.builder_at_end context else_bb) (SIf(first_elif_predicate, first_elif_stmts, (List.tl elif_stmts), else_stmts))) b_br_merge;
+    ignore(L.build_cond_br bool_val then_bb else_bb builder);
+    L.builder_at_end context merge_bb
+  | _           -> builder
+  and
+  build_stmt_list the_function v_symbol_tables builder stmt_list = 
+    List.fold_left (build_stmt the_function v_symbol_tables) builder stmt_list
+  in
   (* function decleration builder *) 
   let build_func  (sf : sfdecl) = () in 
 
@@ -282,12 +308,14 @@ Some _ -> ()
     L.define_function "main" main_t the_module in
   let main_builder = L.builder_at_end context (L.entry_block main_func) in
 
+  let _ = store_builder main_builder in
+
   (* program builder *) 
   let build_program v_symbol_tables (spunit : sp_unit) = match spunit with
-    SStmt(ss)       -> build_stmt main_builder v_symbol_tables ss
+    SStmt(ss)       -> ignore(store_builder(build_stmt main_func v_symbol_tables (get_builder ()) ss))
   | SFdecl(sf)      -> build_func sf
   | SClassdecl(sc)  -> build_class sc in
      
   List.iter (build_program [StringHash.create 10]) sp_units;
-  L.build_ret (L.const_int i32_t 0) main_builder; (* build return for main *)
+  L.build_ret (L.const_int i32_t 0) (get_builder ()); (* build return for main *)
   the_module
