@@ -527,9 +527,9 @@ check_loop update_expr cond_expr stmt_list v_symbol_tables expected_rtype =
   let checked_cond = (check_expr v_symbol_tables cond_expr) in
   let _ = check_type_is_bool (fst checked_cond) in
   let _ = check_expr_is_update update_expr in
-  let checked_update_expr = (check_expr v_symbol_tables cond_expr) in
+  let checked_update_expr = (check_expr v_symbol_tables update_expr) in
   let checked_stmt_list = check_stmt_list ((StringHash.create 10)::v_symbol_tables) expected_rtype stmt_list in
-  SLoop(checked_cond, checked_update_expr, checked_stmt_list)
+  SLoop(checked_update_expr, checked_cond, checked_stmt_list)
 and
 
 check_stmt v_symbol_tables expected_rtype = function

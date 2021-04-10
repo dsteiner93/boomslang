@@ -1,0 +1,16 @@
+int i = 0
+if true:
+	if true:
+		if not false:
+			loop while i<5:
+				# comment
+				println(i)
+				i += 1
+
+int a = 0
+int b = 0
+loop a+=1 while a<3:
+	loop b+=1 while b<3:
+		println(a + " " + b)
+	b = 0
+println(42)

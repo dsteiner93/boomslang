@@ -201,6 +201,10 @@ MyObject x = NULL
     program = b"int x = 2 \n int foo = 2+2 # comment\n\n\n int y = 2\n"
     self.assertProgramPasses(program)
 
+  def test_single_comments_3(self):
+    program = b"int x = 2 \n int foo = 2+2 # comment\n int y = 2\n"
+    self.assertProgramPasses(program)
+
   def test_multi_comments(self):
     program = b"/#comments\ncomments#/\n"
     

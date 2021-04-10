@@ -1,0 +1,90 @@
+int x = (2 + 2) * 2
+println("this is the first thing")
+#string unused = "unused"
+string unused = "unused"
+if x == 8:
+	int unused = 0
+	println("this is nested, and correct"+unused)
+	int z = x + 1
+	if z > 100:
+		# comment
+		println("this should not be hit")
+		println("nor should this")
+	println("this should be hit - elseless if")
+	if z < 20:
+		/# multiline
+			comment
+				with crazy tabs
+                            
+
+                   and non-tab stuff    	
+      		#/
+		println("here is another nested if")
+		if z < 15:
+			println("but we can go deeper")
+		else:
+			println("this is an else that won't be hit")
+			if z == 9:
+				println("this won't be hit because it's inside the else")
+		println("this should be printed too because it's not in the else")
+	elif z == 9:
+	    	# comment before
+		/# another multi-line #/
+		#comment after
+		#one more
+		float unused = 900.0
+	   /#
+		a really weird one
+    	#/
+		println("this is an elif that shouldnt be hit")
+		#comment
+	elif z == 9:
+		println("this is true but won't be hit")
+	elif z < 10:
+		println("this is true but won't be hit")
+	elif z > 100:
+		println("this is false but won't be hit")
+	println("above we had an if elifs with no else, which is fine")
+	if x == 8:
+		println("now let's try if/elif/else")
+	elif x == 8:
+		println("ignored")
+	elif x == 8:
+		println("ignored")
+	else:
+		println("ignored")
+	if x == 8:
+		if x == 8:
+			if x == 8:
+				if x == 8:
+					if x == 8:
+						if x == 9:
+							println("x was 9")
+						else:
+							println("this was nested very deep but who cares?")
+			else:
+				println("this else does not matter")
+
+
+if true:
+	println("true")
+if false:
+	println("false")
+if false:
+	println("false")
+else:
+	println("true")
+if false:
+	println("false")
+elif true:
+	println("true")
+else:
+	println("false")
+
+if (2+2+2+2) == 2 * 4 and 4 == 4:
+	println("this should be printed")
+
+println("here is some more stuff")
+println("more junk")
+string foo = "bar" + "baz"
+println(foo)

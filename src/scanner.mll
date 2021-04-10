@@ -66,9 +66,8 @@ rule tokenize = parse
 | "<" { LT }
 | ">=" { GTE }
 | "<=" { LTE }
-(* Comments *)
-| '#'  { single_comment lexbuf }
-| "/#" { multi_comment lexbuf }
+(* Multi-line comments *)
+| ['\n']+[' ' '\t']*"/#" { multi_comment lexbuf }
 (* Misc. punctuation *)
 | '(' { LPAREN }
 | ')' { RPAREN }
@@ -95,7 +94,11 @@ rule tokenize = parse
    followed by " *)
 | '"' ([^'"''\n'])* '"' as lit { STRING_LITERAL(strip_firstlast lit) }
 (* Syntactically meaningful whitespace - tabs for indentation only *)
-| ['\n']+['\t']* as newlines_and_tabs {
+(* Either a single-line comment appears on a line by itself, in which case
+   we ignore that line completely, or else it appears at the end of the line,
+   in which case we ignore everything after the # before the \n *)
+| (['\n']+[' ' '\t']*('#'[^'\n']*))* { tokenize lexbuf }
+| ('#'[^'\n']*)?(['\n']+['\t']* as newlines_and_tabs) {
   let num_tabs = (count_tabs newlines_and_tabs) in
   if (Stack.top tab_count_stack) == num_tabs then
     NEWLINE
@@ -122,16 +125,12 @@ rule tokenize = parse
    But since this is easy to forget, we automatically add a blank line
    here in case the user forgets. *)
 | eof { (Queue.add EOF token_queue); NEWLINE }
-| _ as char { raise (Failure("Illegal character: " ^ Char.escaped char)) }
+| _ as c { raise (Failure("Illegal character: " ^ Char.escaped c)) }
 
 
 and multi_comment = parse
   "#/" { tokenize lexbuf }
 | _ { multi_comment lexbuf }
-
-and single_comment = parse
-  '\n' { tokenize lexbuf }
-| _ { single_comment lexbuf }
 
 {
 let read_next_token lexbuf =

@@ -1,0 +1,16 @@
+this is the first thing
+this is nested, and correct0
+this should be hit - elseless if
+here is another nested if
+but we can go deeper
+this should be printed too because it's not in the else
+above we had an if elifs with no else, which is fine
+now let's try if/elif/else
+this was nested very deep but who cares?
+true
+true
+true
+this should be printed
+here is some more stuff
+more junk
+barbaz
