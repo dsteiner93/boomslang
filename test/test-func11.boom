@@ -1,0 +1,14 @@
+def printfib(int n) returns void:
+	int i = 0
+	int prev = 1
+	int curr = prev
+	loop i += 1 while i < n:
+		if (i == 0) or (i == 1):
+			println(1)
+		else:
+			int tmp = curr
+			curr += prev
+			prev = curr
+			println(curr)
+
+println(printfib(10))

@@ -1,0 +1,7 @@
+def myadd(int a, int b) returns int:
+	return a + b
+
+def myadd(int a, int b, int c) returns int:
+	return a + b + c
+
+println(myadd(myadd(4, 5), myadd(5, 7, 2)))

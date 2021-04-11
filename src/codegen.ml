@@ -87,7 +87,7 @@ let translate sp_units =
     SignatureMap.add signature func m in
    List.fold_left helper SignatureMap.empty built_in_funcs in
 
-  (* create a hashtable (mutable) of function declarations *)
+  (* create a hashtable (mutable) to store function declarations *)
   let fdecl_hash = SignatureHash.create 10 in
 
   (* expression builder *)
@@ -108,13 +108,13 @@ let translate sp_units =
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
           let signature = { S.fs_name = func_name; S.formal_types = expr_typs } in
-          if SignatureMap.mem signature built_in_map then
+          if SignatureMap.mem signature built_in_map then (* is a built in func *)
             L.build_call (SignatureMap.find signature built_in_map)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
-          else if SignatureHash.mem fdecl_hash signature then
+          else if SignatureHash.mem fdecl_hash signature then (* is a user defined func *)
             L.build_call (SignatureHash.find fdecl_hash signature)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
@@ -268,6 +268,7 @@ let translate sp_units =
     match L.block_terminator (L.insertion_block builder) with
       Some _ -> ()
     | None -> ignore (instr builder) in
+
   (* statement builder *) 
   let rec build_stmt the_function v_symbol_tables builder (ss : sstmt) = match ss with
     SExpr(se)   -> ignore (build_expr builder v_symbol_tables se); builder
@@ -316,31 +317,35 @@ let translate sp_units =
   build_stmt_list the_function v_symbol_tables builder stmt_list = 
     List.fold_left (build_stmt the_function v_symbol_tables) builder stmt_list
   in
+
   (* function decleration builder *) 
   let build_func func_table v_symbol_tables builder (sf : sfdecl) = 
+   (* define the function for llvm *)
    let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list 
     (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) 
     [] sf.sformals)) in
    let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
    let func_builder = L.builder_at_end context (L.entry_block func) in
-   (* alloca and store formals, put stored pointers in v_symbol_table *)
+   (* allocs formals in the stack *)
    let alloca_formal s (typ, name) = 
     s @ [L.build_alloca (ltype_of_typ typ) name func_builder] in
    let stack_vars = List.fold_left alloca_formal [] sf.sformals in
+   (* stores pointers to the stack location of the formal args *)
    let rec store_formals param stack_p = match param, stack_p with
      hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
    | hd1::tl1, hd2::tl2 -> (L.build_store hd1 hd2 func_builder)::(store_formals tl1 tl2)
    | _ -> [] (* TODO: throw a failure here *) in
-   let _ = 
-    let signature = { S.fs_name = sf.sfname; S.formal_types = 
-     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
-    SignatureHash.add fdecl_hash signature func in
-   let _ = store_formals (Array.to_list (L.params func)) stack_vars in
-   (* add a new elem in v_symbol_tables and add formals *)
+   (* add a new elem in this function's v_symbol_tables and add formals *)
    let this_scopes_symbol_table = StringHash.create 10 in
-   let _ = List.iter (fun elem -> StringHash.add this_scopes_symbol_table
-                                  (L.value_name elem) elem) stack_vars in
    let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
+   (* get the signature so we can use put it in fdecl_hash *)
+   let signature = { S.fs_name = sf.sfname; S.formal_types = 
+     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+   let _ = 
+    SignatureHash.add fdecl_hash signature func;
+    store_formals (Array.to_list (L.params func)) stack_vars;
+    List.iter (fun elem -> StringHash.add this_scopes_symbol_table
+                                  (L.value_name elem) elem) stack_vars in
    let last_builder = List.fold_left (fun builder stmt -> 
            build_stmt func v_symbol_tables builder stmt) func_builder sf.sbody in
    (* if user didn't specify return on void function, then add it ourselves *) 
