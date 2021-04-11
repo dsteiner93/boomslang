@@ -25,6 +25,13 @@ module StringHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end)
 
+module SignatureHash = Hashtbl.Make(struct 
+  type t = S.function_signature
+  let equal (x : S.function_signature) (y : S.function_signature) = 
+   (x.fs_name = y.fs_name) && (x.formal_types = y.formal_types)
+  let hash = Hashtbl.hash (* generic hash function *)
+end )
+
 let rec lookup v_symbol_tables s =
   match v_symbol_tables with
   [] -> raise (Failure ("undeclared identifier " ^ s))
@@ -80,6 +87,9 @@ let translate sp_units =
     SignatureMap.add signature func m in
    List.fold_left helper SignatureMap.empty built_in_funcs in
 
+  (* create a hashtable (mutable) of function declarations *)
+  let fdecl_hash = SignatureHash.create 10 in
+
   (* expression builder *)
   let rec build_expr builder v_symbol_tables (exp : sexpr) = match exp with
     _, SIntLiteral(i)      -> L.const_int i32_t i
@@ -100,6 +110,12 @@ let translate sp_units =
           let signature = { S.fs_name = func_name; S.formal_types = expr_typs } in
           if SignatureMap.mem signature built_in_map then
             L.build_call (SignatureMap.find signature built_in_map)
+            (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
+            [] expr_list))
+            (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
+            builder
+          else if SignatureHash.mem fdecl_hash signature then
+            L.build_call (SignatureHash.find fdecl_hash signature)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
@@ -314,6 +330,10 @@ let translate sp_units =
      hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
    | hd1::tl1, hd2::tl2 -> (L.build_store hd1 hd2 func_builder)::(store_formals tl1 tl2)
    | _ -> [] (* TODO: throw a failure here *) in
+   let _ = 
+    let signature = { S.fs_name = sf.sfname; S.formal_types = 
+     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+    SignatureHash.add fdecl_hash signature func in
    let _ = store_formals (Array.to_list (L.params func)) stack_vars in
    (* add a new elem in v_symbol_tables and add formals *)
    let this_scopes_symbol_table = StringHash.create 10 in
