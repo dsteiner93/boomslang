@@ -277,6 +277,8 @@ let translate sp_units =
       add_terminal (build_stmt the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context else_bb) (SIf(first_elif_predicate, first_elif_stmts, (List.tl elif_stmts), else_stmts))) b_br_merge;
       ignore(L.build_cond_br bool_val then_bb else_bb builder);
       L.builder_at_end context merge_bb)
+  | SReturn(sexpr) -> L.build_ret (build_expr builder v_symbol_tables sexpr) builder;
+                      builder
   | SLoop((_, SNullExpr), predicate, body_stmt_list) ->
     let pred_bb = L.append_block context "while" the_function in
     ignore(L.build_br pred_bb builder);
@@ -298,7 +300,29 @@ let translate sp_units =
     List.fold_left (build_stmt the_function v_symbol_tables) builder stmt_list
   in
   (* function decleration builder *) 
-  let build_func builder (sf : sfdecl) = builder in
+  let build_func func_table v_symbol_tables builder (sf : sfdecl) = 
+   let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list 
+    (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) 
+    [] sf.sformals)) in
+   let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
+   let func_builder = L.builder_at_end context (L.entry_block func) in
+   (* alloca and store formals, put stored pointers in v_symbol_table *)
+   let alloca_formal s (typ, name) = 
+    s @ [L.build_alloca (ltype_of_typ typ) name func_builder] in
+   let stack_vars = List.fold_left alloca_formal [] sf.sformals in
+   let rec store_formals param stack_p = match param, stack_p with
+     hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
+   | hd1::tl1, hd2::tl2 -> (L.build_store hd1 hd2 func_builder)::(store_formals tl1 tl2)
+   | _ -> [] (* TODO: throw a failure here *) in
+   let _ = store_formals (Array.to_list (L.params func)) stack_vars in
+   (* add a new elem in v_symbol_tables and add formals *)
+   let this_scopes_symbol_table = StringHash.create 10 in
+   let _ = List.iter (fun elem -> StringHash.add this_scopes_symbol_table
+                                  (L.value_name elem) elem) stack_vars in
+   let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
+   let _ = List.fold_left (fun builder stmt -> 
+           build_stmt func v_symbol_tables builder stmt) func_builder sf.sbody in
+   builder in
 
   (* class decleration builder *) 
   let build_class builder (sc : sclassdecl) = builder in
@@ -313,7 +337,7 @@ let translate sp_units =
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
     SStmt(ss)       -> build_stmt main_func v_symbol_tables builder ss
-  | SFdecl(sf)      -> build_func builder sf
+  | SFdecl(sf)      -> build_func 5 v_symbol_tables builder sf
   | SClassdecl(sc)  -> build_class builder sc in
      
   let final_builder = List.fold_left (build_program [StringHash.create 10]) main_builder sp_units in
