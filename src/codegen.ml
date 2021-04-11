@@ -295,6 +295,7 @@ let translate sp_units =
       L.builder_at_end context merge_bb)
   | SReturn(sexpr) -> L.build_ret (build_expr builder v_symbol_tables sexpr) builder;
                       builder
+  | SReturnVoid -> L.build_ret_void builder; builder
   | SLoop((_, SNullExpr), predicate, body_stmt_list) ->
     let pred_bb = L.append_block context "while" the_function in
     ignore(L.build_br pred_bb builder);
@@ -340,8 +341,12 @@ let translate sp_units =
    let _ = List.iter (fun elem -> StringHash.add this_scopes_symbol_table
                                   (L.value_name elem) elem) stack_vars in
    let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
-   let _ = List.fold_left (fun builder stmt -> 
+   let last_builder = List.fold_left (fun builder stmt -> 
            build_stmt func v_symbol_tables builder stmt) func_builder sf.sbody in
+   (* if user didn't specify return on void function, then add it ourselves *) 
+   let _ = if (sf.srtype = A.Primitive(A.Void)) &&
+           (not (List.mem SReturnVoid sf.sbody)) then
+           ignore (L.build_ret_void last_builder) in
    builder in
 
   (* class decleration builder *) 
