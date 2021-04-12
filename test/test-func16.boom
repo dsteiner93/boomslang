@@ -1,0 +1,31 @@
+int x = myfunc(get_a_string())
+println(x)
+println(myfunc(get_a_string()))
+
+def get_a_string() returns string:
+	return "heres a string"
+
+def myfunc(string x) returns int:
+	int y = 500
+	if y == 500:
+		if y == 500:
+			/#
+				another pointless comment
+
+		#/
+			if y == 500:
+				loop y+=1 while y < 600:
+					if y > 550:
+						int z = y
+						return z
+					elif y == 551:
+						int z = y
+					elif y == 550:
+						return y
+					else:
+						2+2
+	return -1
+
+def myotherfunctuion(int a, int b) returns string:
+	# here's a comment for no real reason
+	return "unused"

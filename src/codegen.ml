@@ -18,12 +18,13 @@ module S = Semant
 open Sast 
 
 module StringMap = Map.Make(String)
-module SignatureMap = Map.Make(struct type t = S.function_signature let compare = compare end)
+module SignatureMap = Map.Make(struct type t = function_signature let compare = compare end)
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
   let equal x y = x = y (* use structural comparison *)
   let hash = Hashtbl.hash (* generic hash function *)
 end)
+
 
 let rec lookup v_symbol_tables s =
   match v_symbol_tables with
@@ -68,7 +69,7 @@ let translate sp_units =
   (* create a map of all of the built in functions *)
   let built_in_map =
    let built_in_funcs : (string * A.typ * (A.typ list)) list =
-     let convert (fs : (S.function_signature * A.typ)) =
+     let convert (fs : (function_signature * A.typ)) =
        (((fst fs).fs_name), (snd fs), ((fst fs).formal_types)) in
      List.map convert Semant.built_in_funcs in
    let helper m e = match e with fun_name, ret_t, arg_ts -> 
@@ -76,24 +77,23 @@ let translate sp_units =
                     (List.fold_left (fun s e -> s @ [ltype_of_typ e]) [] arg_ts) in
     let func = L.declare_function fun_name 
               (L.var_arg_function_type (ltype_of_typ ret_t) arg_t_arr) the_module in
-    let signature = { S.fs_name = fun_name; S.formal_types = arg_ts } in
+    let signature = { fs_name = fun_name; formal_types = arg_ts } in
     SignatureMap.add signature func m in
    List.fold_left helper SignatureMap.empty built_in_funcs in
 
   (* create a map of all the user defined functions *)
   let user_func_map =
     let helper m e = match e with 
-     SFdecl(sf) ->
-      let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list 
-       (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) 
-       [] sf.sformals)) in
-      let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
-      let signature = { S.fs_name = sf.sfname; S.formal_types = 
-       List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
-      SignatureMap.add signature func m
-     | _ -> m in
+      SFdecl(sf) ->
+        let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list
+          (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ])
+          [] sf.sformals)) in
+        let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
+        let signature = { fs_name = sf.sfname; formal_types =
+          List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+        SignatureMap.add signature func m
+    | _ -> m in
     List.fold_left helper SignatureMap.empty sp_units in
-
 
   (* expression builder *)
   let rec build_expr builder v_symbol_tables (exp : sexpr) = match exp with
@@ -112,7 +112,7 @@ let translate sp_units =
         SFuncCall("null_to_string", [(A.NullType, _)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
-          let signature = { S.fs_name = func_name; S.formal_types = expr_typs } in
+          let signature = { fs_name = func_name; formal_types = expr_typs } in
           if SignatureMap.mem signature built_in_map then (* is a built in func *)
             L.build_call (SignatureMap.find signature built_in_map)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
@@ -125,8 +125,8 @@ let translate sp_units =
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
-          else raise (Failure ("function " ^ func_name ^ " not found")); 
-           L.const_int i32_t 0 
+          else raise (Failure ("function " ^ func_name ^ " not found"))
+      | _ -> raise (Failure("method calls are not yet implemented"))
       )
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
@@ -140,11 +140,11 @@ let translate sp_units =
         (* Only an object (not a primitive nor array) may be Null. *)
         (match sexpr2typ with
              A.Class(_) -> get_lvalue_of_bool (L.is_null sexpr2')
-           | _ -> L.const_int (ltype_of_typ (A.Primitive(Bool))) 0)
+           | _ -> L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
       else if (sexpr2typ = A.NullType) then
         (match sexpr1typ with
              A.Class(_) -> get_lvalue_of_bool (L.is_null sexpr1')
-           | _ -> L.const_int (ltype_of_typ (A.Primitive(Bool))) 0)
+           | _ -> L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
       else
         (match sexpr1typ with
           (* Even though these look different, they are all integers internally *)
@@ -157,7 +157,7 @@ let translate sp_units =
           (* Strings are not comparable using an LLVM native function,
              so we call our own C function here. *)
           | A.Primitive(A.String) ->
-              let signature = { S.fs_name = "compare_strings"; S.formal_types = [(fst sexpr1); (fst sexpr2)] } in
+              let signature = { fs_name = "compare_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
               L.build_call (SignatureMap.find signature built_in_map)
                 (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
                 (signature.fs_name ^ "_res") builder
@@ -200,11 +200,9 @@ let translate sp_units =
       ) sexpr1' sexpr2' "tmp" builder
   (* String binops (the only one supported is + for concatenate) *)
   | _, SBinop(((A.Primitive(A.String), _) as sexpr1), binop, ((A.Primitive(A.String), _) as sexpr2)) ->
-      let sexpr1' = build_expr builder v_symbol_tables sexpr1
-      and sexpr2' = build_expr builder v_symbol_tables sexpr2 in
       (match binop with
           A.Plus         ->
-            let signature = { S.fs_name = "concat_strings"; S.formal_types = [(fst sexpr1); (fst sexpr2)] } in
+            let signature = { fs_name = "concat_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
             L.build_call (SignatureMap.find signature built_in_map)
               (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
               (signature.fs_name ^ "_res") builder
@@ -264,7 +262,7 @@ let translate sp_units =
         ((StringHash.add this_scopes_symbol_table name (L.build_alloca (ltype_of_typ typ) name builder));
         ignore(L.build_store e' (lookup v_symbol_tables name) builder));
         e'
-  | _, SUpdate(SRegularUpdate(name, Eq, sexpr)) ->
+  | _, SUpdate(SRegularUpdate(name, A.Eq, sexpr)) ->
       let e' = build_expr builder v_symbol_tables sexpr in
       ignore(L.build_store e' (lookup v_symbol_tables name) builder); e'
   | _ -> raise (Failure("unimplemented expr in codegen"))
@@ -274,50 +272,75 @@ let translate sp_units =
     match L.block_terminator (L.insertion_block builder) with
       Some _ -> ()
     | None -> ignore (instr builder) in
-
   (* statement builder *) 
   let rec build_stmt the_function v_symbol_tables builder (ss : sstmt) = match ss with
     SExpr(se)   -> ignore (build_expr builder v_symbol_tables se); builder
-  | SReturn(sexpr) -> L.build_ret (build_expr builder v_symbol_tables sexpr) builder;
+  | SReturn(sexpr) -> ignore (L.build_ret (build_expr builder v_symbol_tables sexpr) builder);
                       builder
-  | SReturnVoid -> L.build_ret_void builder; builder
+  | SReturnVoid -> ignore (L.build_ret_void builder); builder
   | SIf (predicate, then_stmts, elif_stmts, else_stmts) ->
     let bool_val = build_expr builder v_symbol_tables predicate in
-    let merge_bb = L.append_block context "merge" the_function in
-    let b_br_merge = L.build_br merge_bb in
-    let then_bb = L.append_block context "then" the_function in
-    add_terminal (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context then_bb) then_stmts) b_br_merge;
     if ((List.length elif_stmts) = 0 && (List.length else_stmts) = 0) then
-      (ignore(L.build_cond_br bool_val then_bb merge_bb builder);
-      L.builder_at_end context merge_bb)
-    else if ((List.length elif_stmts) = 0) then
-      (let else_bb = L.append_block context "else" the_function in
-      add_terminal (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context else_bb) else_stmts) b_br_merge;
-      ignore(L.build_cond_br bool_val then_bb else_bb builder);
-      L.builder_at_end context merge_bb)
+      let merge_bb = L.append_block context "merge" the_function in
+      let b_br_merge = L.build_br merge_bb in
+      let then_bb = L.append_block context "then" the_function in
+      let _ = add_terminal (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context then_bb) then_stmts) b_br_merge in
+      (ignore(L.build_cond_br bool_val then_bb merge_bb builder));
+      L.builder_at_end context merge_bb
     else
-      (let else_bb = L.append_block context "else" the_function in
-      let first_elif = List.hd elif_stmts in
-      let first_elif_predicate = fst first_elif in
-      let first_elif_stmts = snd first_elif in
-      add_terminal (build_stmt the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context else_bb) (SIf(first_elif_predicate, first_elif_stmts, (List.tl elif_stmts), else_stmts))) b_br_merge;
-      ignore(L.build_cond_br bool_val then_bb else_bb builder);
-      L.builder_at_end context merge_bb)
-  | SLoop((_, SNullExpr), predicate, body_stmt_list) ->
+      let then_bb = L.append_block context "then" the_function in
+      let then_stmts_builder = build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context then_bb) then_stmts in
+      let else_bb = L.append_block context "else" the_function in
+      let else_stmts_builder =
+        if (List.length elif_stmts = 0) then
+          (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context else_bb) else_stmts)
+        else
+          let first_elif = List.hd elif_stmts in
+          let first_elif_predicate = fst first_elif in
+          let first_elif_stmts = snd first_elif in
+          (build_stmt the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context else_bb) (SIf(first_elif_predicate, first_elif_stmts, (List.tl elif_stmts), else_stmts)))
+      in
+      (match (L.block_terminator (L.insertion_block then_stmts_builder)) with
+         Some(_) -> (
+                     (match (L.block_terminator (L.insertion_block else_stmts_builder)) with
+                        Some(_) -> (ignore(L.build_cond_br bool_val then_bb else_bb builder);
+                                    builder
+                                   )
+                      | None -> (let merge_bb = L.append_block context "merge" the_function in
+                                 let b_br_merge = L.build_br merge_bb in
+                                 let _ = add_terminal else_stmts_builder b_br_merge in
+                                 ignore(L.build_cond_br bool_val then_bb else_bb builder);
+                                 L.builder_at_end context merge_bb
+                                )
+                     )
+                    )
+       | None -> (let merge_bb = L.append_block context "merge" the_function in
+                  let b_br_merge = L.build_br merge_bb in
+                  let _ = add_terminal then_stmts_builder b_br_merge in
+                  let _ = add_terminal else_stmts_builder b_br_merge in
+                  ignore(L.build_cond_br bool_val then_bb else_bb builder);
+                  L.builder_at_end context merge_bb
+                 )
+      )
+  | SLoop(update, predicate, body_stmt_list) ->
     let pred_bb = L.append_block context "while" the_function in
     ignore(L.build_br pred_bb builder);
 
     let body_bb = L.append_block context "while_body" the_function in
-    add_terminal (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context body_bb) body_stmt_list) (L.build_br pred_bb);
+
+    let while_stmts_builder = (build_stmt_list the_function ((StringHash.create 10)::v_symbol_tables) (L.builder_at_end context body_bb) body_stmt_list) in
+    let _ = (match (L.block_terminator (L.insertion_block while_stmts_builder)) with
+       Some(_) -> () (* The body already returns, so no need to add the update expression to the end, nor do we need to add a terminal *)
+     (* The body did not already return. So we need to do 2 things: Add the update expression and a terminal *)
+     | None -> add_terminal (build_stmt the_function v_symbol_tables while_stmts_builder (SExpr(update))) (L.build_br pred_bb)
+    ) in
 
     let pred_builder = L.builder_at_end context pred_bb in
     let bool_val = build_expr pred_builder v_symbol_tables predicate in
 
     let merge_bb = L.append_block context "merge" the_function in
-    ignore(L.build_cond_br bool_val body_bb merge_bb pred_builder);
+    ignore (L.build_cond_br bool_val body_bb merge_bb pred_builder);
     L.builder_at_end context merge_bb
-  | SLoop(update, predicate, body_stmt_list) ->
-      build_stmt the_function v_symbol_tables builder (SLoop((A.NullType, SNullExpr), predicate, (body_stmt_list @ [SExpr(update)])))
   | _           -> builder
   and
   build_stmt_list the_function v_symbol_tables builder stmt_list = 
@@ -326,8 +349,8 @@ let translate sp_units =
 
   (* function decleration builder *) 
   let build_func v_symbol_tables builder (sf : sfdecl) = 
-    let signature = { S.fs_name = sf.sfname; S.formal_types = 
-     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+    let signature = { fs_name = sf.sfname; formal_types =
+      List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
     let func = SignatureMap.find signature user_func_map in
     let func_builder = L.builder_at_end context (L.entry_block func) in
     (* allocs formals in the stack *)
@@ -336,14 +359,15 @@ let translate sp_units =
     let stack_vars = List.fold_left alloca_formal [] sf.sformals in
     (* stores pointers to the stack location of the formal args *)
     let rec store_formals param stack_p = match param, stack_p with
-      hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
+      [], [] -> []
+    | hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
     | hd1::tl1, hd2::tl2 -> (L.build_store hd1 hd2 func_builder)::(store_formals tl1 tl2)
-    | _ -> raise (Failure "store_formals array mismatch!"); []  in
+    | _ -> raise (Failure "store_formals array mismatch!") in
     (* add a new elem in this function's v_symbol_tables and add formals *)
     let this_scopes_symbol_table = StringHash.create 10 in
     let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
     let _ = 
-      store_formals (Array.to_list (L.params func)) stack_vars;
+      ignore (store_formals (Array.to_list (L.params func)) stack_vars);
       List.iter (fun elem -> StringHash.add this_scopes_symbol_table
                                   (L.value_name elem) elem) stack_vars in
     let last_builder = List.fold_left (fun builder stmt -> 
@@ -371,5 +395,5 @@ let translate sp_units =
   | SClassdecl(sc)  -> build_class builder sc in
      
   let final_builder = List.fold_left (build_program [StringHash.create 10]) main_builder sp_units in
-  L.build_ret (L.const_int i32_t 0) final_builder; (* build return for main *)
+  ignore (L.build_ret (L.const_int i32_t 0) final_builder); (* build return for main *)
   the_module

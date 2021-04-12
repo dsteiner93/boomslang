@@ -1,0 +1,21 @@
+int x = myfunc("foo")
+println(x)
+println(myfunc("bar"))
+
+def myfunc(string x) returns int:
+	int y = 500
+	if y == 500:
+		if y == 500:
+			/# just throwing a comment in
+
+				to make sure
+			comments are working inside functions
+#/
+			if y == 500:
+				loop y+=1 while y < 600:
+					return y
+	return -1
+
+def myotherfunctuion(int a, int b) returns string:
+	# here's a comment for no real reason
+	return "unused"

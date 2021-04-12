@@ -63,6 +63,11 @@ type sp_unit =
 
 type sprogram = sp_unit list
 
+type function_signature = {
+  fs_name: string;
+  formal_types: typ list;
+}
+
 (* Begin visualization functions *)
 let rec str_of_typ = function
   Primitive(Int) -> "int"

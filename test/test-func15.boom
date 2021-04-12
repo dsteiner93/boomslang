@@ -1,0 +1,16 @@
+# test mutual recursion for functions
+
+println(a(0))
+
+def a(int x) returns int:
+	int z = 5 + 5
+	if x > 5:
+		return 5
+	else:
+		return b(x+1)
+
+def b(int x) returns int:
+	if x > 5:
+		return 10
+	else:
+		return a(x+1)

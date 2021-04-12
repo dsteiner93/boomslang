@@ -1,0 +1,6 @@
+println('a' + 'b')
+string foo = 'c' + 'd'
+println(foo)
+println(myfunc())
+def myfunc() returns string:
+	return 'e' + 'f' + 'g'

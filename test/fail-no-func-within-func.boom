@@ -1,0 +1,4 @@
+def myfunc():
+	def myfunc2():
+		println("hey")
+	println("hey")
