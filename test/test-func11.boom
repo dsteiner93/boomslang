@@ -8,7 +8,7 @@ def printfib(int n) returns void:
 		else:
 			int tmp = curr
 			curr += prev
-			prev = curr
+			prev = tmp
 			println(curr)
 
-println(printfib(10))
+printfib(10)

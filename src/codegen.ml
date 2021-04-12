@@ -25,13 +25,6 @@ module StringHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end)
 
-module SignatureHash = Hashtbl.Make(struct 
-  type t = S.function_signature
-  let equal (x : S.function_signature) (y : S.function_signature) = 
-   (x.fs_name = y.fs_name) && (x.formal_types = y.formal_types)
-  let hash = Hashtbl.hash (* generic hash function *)
-end )
-
 let rec lookup v_symbol_tables s =
   match v_symbol_tables with
   [] -> raise (Failure ("undeclared identifier " ^ s))
@@ -87,8 +80,20 @@ let translate sp_units =
     SignatureMap.add signature func m in
    List.fold_left helper SignatureMap.empty built_in_funcs in
 
-  (* create a hashtable (mutable) to store function declarations *)
-  let fdecl_hash = SignatureHash.create 10 in
+   (* create a map of all the user defined functions *)
+   let user_func_map =
+    let helper m e = match e with 
+     SFdecl(sf) ->
+      let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list 
+       (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) 
+       [] sf.sformals)) in
+      let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
+      let signature = { S.fs_name = sf.sfname; S.formal_types = 
+       List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+      SignatureMap.add signature func m
+     | _ -> m in
+    List.fold_left helper SignatureMap.empty sp_units in
+
 
   (* expression builder *)
   let rec build_expr builder v_symbol_tables (exp : sexpr) = match exp with
@@ -114,8 +119,8 @@ let translate sp_units =
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
-          else if SignatureHash.mem fdecl_hash signature then (* is a user defined func *)
-            L.build_call (SignatureHash.find fdecl_hash signature)
+          else if SignatureMap.mem signature user_func_map then (* is a user defined func *)
+            L.build_call (SignatureMap.find signature user_func_map)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
@@ -319,12 +324,10 @@ let translate sp_units =
   in
 
   (* function decleration builder *) 
-  let build_func func_table v_symbol_tables builder (sf : sfdecl) = 
-   (* define the function for llvm *)
-   let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list 
-    (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) 
-    [] sf.sformals)) in
-   let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
+  let build_func v_symbol_tables builder (sf : sfdecl) = 
+   let signature = { S.fs_name = sf.sfname; S.formal_types = 
+     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
+   let func = SignatureMap.find signature user_func_map in
    let func_builder = L.builder_at_end context (L.entry_block func) in
    (* allocs formals in the stack *)
    let alloca_formal s (typ, name) = 
@@ -338,11 +341,7 @@ let translate sp_units =
    (* add a new elem in this function's v_symbol_tables and add formals *)
    let this_scopes_symbol_table = StringHash.create 10 in
    let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
-   (* get the signature so we can use put it in fdecl_hash *)
-   let signature = { S.fs_name = sf.sfname; S.formal_types = 
-     List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
    let _ = 
-    SignatureHash.add fdecl_hash signature func;
     store_formals (Array.to_list (L.params func)) stack_vars;
     List.iter (fun elem -> StringHash.add this_scopes_symbol_table
                                   (L.value_name elem) elem) stack_vars in
@@ -367,7 +366,7 @@ let translate sp_units =
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
     SStmt(ss)       -> build_stmt main_func v_symbol_tables builder ss
-  | SFdecl(sf)      -> build_func 5 v_symbol_tables builder sf
+  | SFdecl(sf)      -> build_func v_symbol_tables builder sf
   | SClassdecl(sc)  -> build_class builder sc in
      
   let final_builder = List.fold_left (build_program [StringHash.create 10]) main_builder sp_units in
