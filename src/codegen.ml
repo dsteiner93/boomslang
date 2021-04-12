@@ -25,7 +25,6 @@ module StringHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end)
 
-
 let rec lookup v_symbol_tables s =
   match v_symbol_tables with
   [] -> raise (Failure ("undeclared identifier " ^ s))
