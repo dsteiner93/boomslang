@@ -1,0 +1,4 @@
+int i = 5
+loop i -= 1 while i > 0:
+	println(i)
+println(42)

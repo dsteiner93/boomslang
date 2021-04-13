@@ -1,0 +1,5 @@
+int a = 0
+def foo(int c) returns void:
+	a = c + 42
+foo(73)
+println(a)
