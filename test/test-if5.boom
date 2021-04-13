@@ -1,0 +1,10 @@
+def cond(boolean b) returns int:
+	int x = 0
+	if (b):
+		x = 42
+	else:
+		x = 17
+	return x
+
+println(cond(true))
+println(cond(false))

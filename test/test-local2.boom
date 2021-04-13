@@ -1,0 +1,6 @@
+def foo(int a, boolean b) returns int:
+	int c = a
+	boolean d = false
+	return c + 10
+
+println(foo(37, false))
