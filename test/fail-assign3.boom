@@ -1,0 +1,5 @@
+def myvoid() returns void:
+	return
+
+int i = 0
+i = myvoid() # Fail: assigning a void to an integer
