@@ -1,0 +1,3 @@
+int i = 0
+loop i += 1 while i < 10:
+	foo() # Error: no function foo

@@ -1,0 +1,3 @@
+def foo(int a, boolean b) returns void:
+	return
+foo(42, true, false) # Wrong number of arguments

@@ -1,0 +1,3 @@
+int i = 0
+loop i += 1 while i: # i is an integer, not Boolean
+	println("Error")

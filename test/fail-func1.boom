@@ -1,0 +1,5 @@
+def bar() returns int:
+	return 0
+
+def bar() returns void:
+	return # Error: duplicate function bar

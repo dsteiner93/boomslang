@@ -1,0 +1,7 @@
+def foo(int a, boolean b) returns void:
+	return
+
+def bar() returns void:
+	return
+
+foo(42, bar()) # int and void, not int and bool

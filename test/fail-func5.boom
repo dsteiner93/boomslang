@@ -1,0 +1,3 @@
+def bar() returns int:
+	void b = 2 # Error: illegal void local b
+	return 0
