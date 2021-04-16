@@ -1,0 +1,6 @@
+int c = 0
+boolean b = true
+void a = 3 # global variables should not be void
+
+def foo() returns int:
+	return 0

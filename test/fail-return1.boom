@@ -1,0 +1,2 @@
+def foo() returns int:
+	return true # Should return int

@@ -1,0 +1,8 @@
+if (true):
+	int a = 0
+if (false):
+	int b = 1
+else:
+	int c = 2
+if (42): # Error: non-bool predicate
+	int d = 3

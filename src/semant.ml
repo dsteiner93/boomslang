@@ -536,7 +536,7 @@ check_stmt v_symbol_tables expected_rtype = function
                  | _ -> raise (Failure("Expected a void return but found a " ^ (str_of_typ expected_rtype) ^ " return"))
                 )
 | Return(expr) -> (match expected_rtype with
-                     Primitive(Void) -> raise (Failure("Found a void return inside a function that required a " ^ (str_of_typ expected_rtype) ^ " return."))
+                     Primitive(Void) -> raise (Failure("Found a non-void return inside a function that required a " ^ (str_of_typ expected_rtype) ^ " return."))
                    | NullType -> raise (Failure("Found return statement in unexpected place (i.e. a statement outside of a function."))
                    | _ ->
                      let checked_expr = (check_expr v_symbol_tables expr) in
