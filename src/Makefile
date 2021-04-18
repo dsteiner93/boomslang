@@ -54,8 +54,8 @@ TARFILES = README.md Makefile \
 zip :
 	zip boomslang $(TARFILES)
 
-make test :
+test :
 	../test/testall.sh
 
-make pythontest :
+pythontest :
 	python3 -m unittest run_tests

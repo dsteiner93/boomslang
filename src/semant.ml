@@ -155,6 +155,10 @@ let add_class_signature map = function
 in
 List.fold_left add_class_signature StringMap.empty program
 in
+let check_class_exists class_name =
+  if StringMap.mem class_name class_signatures then ()
+  else raise (Failure("Class name " ^ class_name ^ " was never defined."))
+in
 (* Next, figure out the types for all variables for classes.
    This will build a Map<ClassName, Map<VariableName, TypeOfVariable>> *)
 let class_variable_types =
@@ -171,6 +175,21 @@ let add_class_variables map = function
       ((List.map get_tuple_from_assign classdecl.static_vars) @
        (List.map get_tuple_from_bind classdecl.required_vars) @
        (List.map get_tuple_from_assign classdecl.optional_vars))) map
+| _ -> map
+in
+List.fold_left add_class_variables StringMap.empty program
+in
+let class_static_vars =
+let add_class_variable map tuple = StringMap.add (fst tuple) (snd tuple) map in
+let get_tuple_from_assign = function
+  RegularAssign(typ, str, _) -> (str, typ)
+in
+let add_class_variables map = function
+  (* Duplicate class names, duplicate variable names within a class,
+     and improper assigns/binds are checked in other parts of the code *)
+  Classdecl(classdecl) -> StringMap.add classdecl.cname
+    (List.fold_left add_class_variable StringMap.empty
+      (List.map get_tuple_from_assign classdecl.static_vars)) map
 | _ -> map
 in
 List.fold_left add_class_variables StringMap.empty program
@@ -238,18 +257,29 @@ check_call v_symbol_tables = function
 | MethodCall(object_name, fname, exprs) -> check_mcall object_name fname exprs v_symbol_tables
 and
 
-check_object_variable_access v_symbol_tables object_variable_access =
-  let object_type = (type_of_identifier v_symbol_tables (fst object_variable_access)) in
-  match object_type with
-    Class(class_name) -> (* Then check that the variable being accessed on the class actually exists *)
-      if StringMap.mem class_name class_variable_types then
-        let class_variable_map = StringMap.find class_name class_variable_types in
-        if StringMap.mem (snd object_variable_access) class_variable_map then
-          let typ_of_access = StringMap.find (snd object_variable_access) class_variable_map in
+check_object_variable_access v_symbol_tables = function
+  (id, var_name, is_static_access) as object_variable_access ->
+    if is_static_access then
+      let class_name = id in
+      if StringMap.mem class_name class_static_vars then
+        let class_variable_map = StringMap.find class_name class_static_vars in
+        if StringMap.mem (var_name) class_variable_map then
+          let typ_of_access = StringMap.find (var_name) class_variable_map in
           (typ_of_access, (SObjectVariableAccess object_variable_access))
-        else raise (Failure("Could not find a variable named " ^ (snd object_variable_access) ^ " in class " ^ class_name))
-      else raise (Failure("Could not find a definition for class name " ^ class_name ^ " which corresponded to variable " ^ (fst object_variable_access)))
-  | _ -> raise (Failure("Attempted to access variable " ^ (snd object_variable_access) ^ " on " ^ (fst object_variable_access) ^ ", which isn't an object."))
+        else raise (Failure("Could not find a static variable named " ^ (var_name) ^ " in class " ^ class_name))
+      else raise (Failure("Could not find a definition for class name " ^ class_name))
+    else
+      let object_type = (type_of_identifier v_symbol_tables id) in
+      match object_type with
+        Class(class_name) -> (* Then check that the variable being accessed on the class actually exists *)
+          if StringMap.mem class_name class_variable_types then
+            let class_variable_map = StringMap.find class_name class_variable_types in
+            if StringMap.mem (var_name) class_variable_map then
+              let typ_of_access = StringMap.find (var_name) class_variable_map in
+              (typ_of_access, (SObjectVariableAccess object_variable_access))
+            else raise (Failure("Could not find a variable named " ^ (var_name) ^ " in class " ^ class_name))
+          else raise (Failure("Could not find a definition for class name " ^ class_name ^ " which corresponded to variable " ^ (id)))
+      | _ -> raise (Failure("Attempted to access variable " ^ (var_name) ^ " on " ^ (id) ^ ", which isn't an object."))
 and
 
 check_lhs_is_not_void = function
@@ -494,7 +524,8 @@ check_expr v_symbol_tables = function
 | Assign(assign) ->
     (let checked_assign = (check_assign v_symbol_tables assign) in
      match checked_assign with
-       SRegularAssign(lhs_type, _, _) -> (lhs_type, SAssign(checked_assign)))
+       SRegularAssign(lhs_type, _, _) -> (lhs_type, SAssign(checked_assign))
+     | _ -> raise (Failure("Found unexpected assign type")))
 | Update(update) -> check_update v_symbol_tables update
 and
 
@@ -604,6 +635,7 @@ check_binds (kind : string) (binds : bind list) = (* check_binds was stolen from
   List.iter (function
       (Primitive(Void), b) -> raise (Failure ("illegal void " ^ kind ^ " " ^ b))
     | (NullType, b) -> raise (Failure ("illegal null " ^ kind ^ " " ^ b))
+    | (Class(class_name), _) -> check_class_exists class_name
     | _ -> ()) binds;
   dups kind (List.sort (fun (a) (b) -> compare a b) (List.map (snd) binds))
 and
@@ -629,10 +661,10 @@ and
 get_sstmt_from_bind bind =
   let typ = (fst bind) in
   let name = (snd bind) in
-  SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name), Eq, (typ, SId(name)))))
+  SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name, false), Eq, (typ, SId(name)))))
 and
 get_sstmt_from_assign_with_default v_symbol_tables = function
-  RegularAssign(typ, name, expr) -> SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name), Eq, (check_expr v_symbol_tables expr))))
+  RegularAssign(typ, name, expr) -> SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name, false), Eq, (check_expr v_symbol_tables expr))))
 and
 get_required_only_constructor v_symbol_tables classdecl =
   let body = (List.map get_sstmt_from_bind classdecl.required_vars) @ (List.map (get_sstmt_from_assign_with_default v_symbol_tables) classdecl.optional_vars) in
@@ -668,12 +700,16 @@ add_to_string_if_not_present classdecl checked_fdecls =
   let original_func_signatures = (List.fold_left add_fdecl SignatureMap.empty classdecl.methods) in
   checked_fdecls @ (List.filter (signature_is_not_yet_defined original_func_signatures) [get_default_to_string classdecl])
 and
+convert_to_static_assign class_name = function
+  SRegularAssign(lhs_typ, lhs_name, rhs_expr) -> SStaticAssign(class_name, lhs_typ, lhs_name, rhs_expr)
+| _ -> raise (Failure("Found unexpected assignment type in class " ^ class_name))
+and
 check_classdecl v_symbol_tables classdecl =
   (* First check for duplicates in the class variables *)
   (dups ("classdecl " ^ classdecl.cname) (List.sort (fun (a) (b) -> compare a b) (get_all_class_variable_names classdecl)));
   (* Then check all the assigns and bindings are correct *)
   let new_v_symbol_tables = (StringHash.create 10)::v_symbol_tables in (* class gets a new level of symbols *)
-  let checked_static_vars = List.map (check_assign new_v_symbol_tables) classdecl.static_vars in
+  let checked_static_vars = List.map (convert_to_static_assign classdecl.cname) (List.map (check_assign new_v_symbol_tables) classdecl.static_vars) in
   let checked_required_vars = (ignore (check_binds ("classdecl " ^ classdecl.cname) classdecl.required_vars)); classdecl.required_vars in
   let checked_optional_vars = List.map (check_assign new_v_symbol_tables) classdecl.optional_vars in
   (* Inside this class, make sure "self" by itself points to this class type *)
