@@ -1,0 +1,3 @@
+if (false):
+	println(42)
+println(17)

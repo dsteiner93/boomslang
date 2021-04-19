@@ -1,0 +1,71 @@
+class MyClass:
+	#adding some comments
+	static:
+		string staticx = "foo"
+		int staticy = 5
+
+	required:
+		int one
+		# adding some comments
+		string two
+		MyClass recursive1
+
+	optional:
+		float three = 3.0
+		float four = 4.0
+		float five  = 5.0 # adding some comments
+		char six = '6'
+		MyClass recursive2 = MyClass() # adding some comments
+
+	def construct():
+		println("called custom constructor")
+
+	def to_string() returns string:
+		# adding some comments
+		return "this is my custom tostring"
+# adding some comments
+	def method1(int a, int b, int z) returns int:
+		println("called method1")
+		int q = a + b + z
+		int z = q
+		return z
+
+	def return_self() returns MyClass:
+		return self
+
+	# adding some comments
+	def method2():
+    # adding some comments
+		println("called method2")
+
+println("printing some random stuff")
+MyClass foo1 = MyClass(1, "two", MyClass())
+println(foo1)
+println(foo1.one)
+println(foo1.two)
+println(foo1.three)
+println(foo1.four)
+println(foo1.five)
+println(foo1.six)
+MyClass recursive1 = foo1.recursive1
+MyClass recursive2 = foo1.recursive2
+println(recursive1)
+println(recursive2.to_string())
+println(foo1.method1(1, 2, 3))
+foo1.method2()
+
+MyClass foo2 = MyClass(1, "two", MyClass())
+println(foo2.staticx)
+println(foo2.staticy)
+foo1.staticx = "new value"
+foo2.staticy = 5000
+println(foo1.staticy)
+println(foo2.staticx)
+println(MyClass.staticx)
+println(MyClass.staticy)
+MyClass.staticx = "successfully updated static var"
+MyClass.staticy *= 2
+println(MyClass.staticx)
+println(MyClass.staticy)
+MyClass copy = foo1.return_self()
+println(copy)

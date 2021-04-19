@@ -28,6 +28,11 @@ and scall =
 | SMethodCall of string * string * sexpr list
 and sassign =
   SRegularAssign of typ * string * sexpr
+(* These look similar, but will be treated differently in codegen.
+   The first string is the class name, the second is the var name.
+   This is only used when setting the initial value inside a class.
+   Things of the form MyClass.x = foo are SUpdates. *)
+| SStaticAssign of string * typ * string * sexpr
 and supdate =
   SRegularUpdate of string * updateop * sexpr
 | SObjectVariableUpdate of object_variable_access * updateop * sexpr
@@ -96,10 +101,6 @@ let string_of_id_typ existing_suffix new_index id_string typ =
   let suffix = new_suffix existing_suffix new_index in
   ("id" ^ suffix, ["id" ^ suffix ^ " [label=\"id: " ^ id_string ^ " (" ^ (str_of_typ typ) ^ ")\" fontcolor=red]"])
 
-let string_of_object_variable_access existing_suffix new_index object_variable_access =
-  let suffix = new_suffix existing_suffix new_index in
-  ("obj_var_access" ^ suffix, ["obj_var_access" ^ suffix ^ " [label=\"" ^ (fst object_variable_access) ^ "." ^ (snd object_variable_access) ^"\"]"])
-
 let rec string_of_sexpr existing_suffix new_index sexpr =
   let suffix = new_suffix existing_suffix new_index in
   let typ = (fst sexpr) in
@@ -137,6 +138,7 @@ and string_of_sassign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   SRegularAssign(typ, id_string, sexpr) -> combine_list_typ "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_sexpr suffix 3 sexpr]) typ
+| SStaticAssign(_, typ, id_string, sexpr) -> combine_list_typ "assign" suffix ([string_of_typ suffix 0 typ] @ [string_of_id suffix 1 id_string] @ [string_of_updateop suffix 2 Eq] @ [string_of_sexpr suffix 3 sexpr]) typ
 and string_of_supdate typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function

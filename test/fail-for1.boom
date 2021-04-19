@@ -1,0 +1,14 @@
+def foo() returns int:
+	int i = 0
+	loop i += 1 while true:
+		println("forever")
+
+	i = 0
+	loop i += 1 while i < 10:
+		if (i == 3):
+			return 42
+
+	i = 0
+	loop j += 1 while i < 10:
+		println("Error") # j undefined
+	return 0

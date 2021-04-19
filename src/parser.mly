@@ -184,8 +184,9 @@ object_instantiation:
 | CLASS_NAME LPAREN RPAREN { ObjectInstantiation ($1, []) }
 
 object_variable_access:
-  IDENTIFIER PERIOD IDENTIFIER { ($1, $3) }
-| SELF PERIOD IDENTIFIER { ("self", $3) }
+  IDENTIFIER PERIOD IDENTIFIER { ($1, $3, false) }
+| SELF PERIOD IDENTIFIER { ("self", $3, false) }
+| CLASS_NAME PERIOD IDENTIFIER { ($1, $3, true) }
 
 array_access:
   IDENTIFIER LBRACKET expr RBRACKET { ($1, $3) }

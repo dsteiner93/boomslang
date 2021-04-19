@@ -1,0 +1,2 @@
+def bar(int a, boolean b, int a) returns int: # Error: duplicate formal a in bar
+	return 0

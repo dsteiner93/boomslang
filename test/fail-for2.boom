@@ -1,0 +1,3 @@
+int i = 0
+loop i += 1 while j < 10: # j undefined
+	println("Error")

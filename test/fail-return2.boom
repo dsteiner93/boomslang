@@ -1,0 +1,5 @@
+def foo() returns void:
+	if (true):
+		return 42 # Should return void 
+	else:
+		return

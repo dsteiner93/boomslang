@@ -25,11 +25,26 @@ module StringHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end)
 
+type symbol_table_entry = {
+  llvalue: L.llvalue;
+  typ: A.typ;
+}
+
 let rec lookup v_symbol_tables s =
   match v_symbol_tables with
   [] -> raise (Failure ("undeclared identifier " ^ s))
-  | hd::tl -> try StringHash.find hd s
+  | hd::tl -> try (StringHash.find hd s).llvalue
               with Not_found -> (lookup tl s)
+
+let rec lookup_class_name v_symbol_tables s =
+  match v_symbol_tables with
+  [] -> raise (Failure ("could not find a class name for id " ^ s))
+  | hd::tl -> try (match (StringHash.find hd s).typ with
+                     A.Class(class_name) -> class_name
+                   | _ -> (lookup_class_name tl s))
+              with Not_found -> (lookup_class_name tl s)
+
+let get_static_var_name class_name var_name = class_name ^ "." ^ var_name
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
@@ -49,17 +64,39 @@ let translate sp_units =
   and void_t     = L.void_type          context
   in
 
+  (* Need to build a struct type for every class *)
+  let class_name_to_named_struct =
+    let helper m e = match e with
+      SClassdecl(scd) -> (StringMap.add scd.scname (L.named_struct_type context scd.scname) m)
+    | _ -> m in
+  List.fold_left helper StringMap.empty sp_units
+  in
   (* Return the LLVM type for a Boomslang type *)
   let ltype_of_typ = function
-     A.Primitive(A.Int)    -> i32_t
-  |  A.Primitive(A.Long)   -> i64_t
-  |  A.Primitive(A.Float)  -> float_t
-  |  A.Primitive(A.Char)   -> i8_t
-  |  A.Primitive(A.String) -> str_t
-  |  A.Primitive(A.Bool)   -> i1_t
-  |  A.Primitive(A.Void)   -> void_t
-  |  _                     -> void_t
+    A.Primitive(A.Int)    -> i32_t
+  | A.Primitive(A.Long)   -> i64_t
+  | A.Primitive(A.Float)  -> float_t
+  | A.Primitive(A.Char)   -> i8_t
+  | A.Primitive(A.String) -> str_t
+  | A.Primitive(A.Bool)   -> i1_t
+  | A.Primitive(A.Void)   -> void_t
+  (* Classes, arrays, and null type *)
+  (* Classes always get passed around as pointers to the memory where the full struct is stored *)
+  | A.Class(class_name)   -> L.pointer_type (StringMap.find class_name class_name_to_named_struct)
+  | _                     -> void_t (* TODO remove this and fill in other types *)
   in
+  let get_bind_from_assign = function
+    SRegularAssign(typ, name, _) -> (typ, name)
+  | SStaticAssign(_, typ, name, _) -> (typ, name)
+  in
+  let helper = function
+    SClassdecl(scd) ->
+      (* In order to have it work recursively, first you have to use a named struct type.
+         Then you have to fill in the body. *)
+      let elts = (Array.of_list (List.map ltype_of_typ (List.map (fst) (scd.srequired_vars @ (List.map get_bind_from_assign scd.soptional_vars))))) in
+      L.struct_set_body (StringMap.find scd.scname class_name_to_named_struct) elts false
+    | _ -> () in
+  let _ = List.iter helper sp_units in
   let get_lvalue_of_bool = function
     true -> (L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 1)
   | false -> (L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
@@ -84,7 +121,7 @@ let translate sp_units =
   let user_func_map =
     let helper m e = match e with 
       SFdecl(sf) ->
-        let func_t = L.var_arg_function_type (ltype_of_typ sf.srtype) (Array.of_list
+        let func_t = L.function_type (ltype_of_typ sf.srtype) (Array.of_list
           (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ])
           [] sf.sformals)) in
         let func = L.define_function (sf.sfname ^ "_usr") func_t the_module in
@@ -94,6 +131,47 @@ let translate sp_units =
     | _ -> m in
     List.fold_left helper SignatureMap.empty sp_units in
 
+  (* builds a map from string to map of function signature to LLVM function definition *)
+  let class_signature_map =
+    let helper1 m1 e1 = match e1 with
+      SClassdecl(scd) ->
+        let helper2 m2 mdecl =
+          let func_t = L.function_type (ltype_of_typ mdecl.srtype) (Array.of_list
+            (ltype_of_typ (A.Class(scd.scname))::
+            (List.fold_left (fun s e -> match e with typ, _ -> s @ [ltype_of_typ typ]) [] mdecl.sformals))
+          ) in
+          let func = L.define_function (mdecl.sfname ^ "_classmethod") func_t the_module in
+          let signature = { fs_name = mdecl.sfname; formal_types =
+            List.fold_left (fun s (typ, _) -> s @ [typ]) [] mdecl.sformals } in
+          SignatureMap.add signature func m2 in
+        StringMap.add scd.scname (List.fold_left helper2 SignatureMap.empty scd.smethods) m1
+    | _ -> m1 in
+    List.fold_left helper1 StringMap.empty sp_units in
+
+  (* to get an element from the struct, we have to use its index in the struct, rather
+     than the name. this is annoying, but there doesn't seem to be a way to avoid it. *)
+  let class_name_to_decl =
+    let helper1 m1 e1 = match e1 with
+      SClassdecl(scd) -> StringMap.add scd.scname scd m1
+    | _ -> m1 in
+  List.fold_left helper1 StringMap.empty sp_units in
+  let rec find x lst = (* stolen from https://stackoverflow.com/questions/31279920/finding-an-item-in-a-list-and-returning-its-index-ocaml *)
+    match lst with
+    | [] -> raise (Failure("Index for v_name " ^ x ^ " not found"))
+    | h :: t -> if x = h then 0 else 1 + find x t
+  in
+  let get_index_in_class class_name v_name =
+    let scdecl = StringMap.find class_name class_name_to_decl in
+    (find v_name (List.map (snd) (scdecl.srequired_vars @ (List.map get_bind_from_assign scdecl.soptional_vars))))
+  in
+  let get_name_of_assign = function
+    SRegularAssign(_, lhs_name, _) -> lhs_name
+  | SStaticAssign(_, _, lhs_name, _) -> lhs_name
+  in
+  let is_static_variable class_name v_name =
+    let scdecl = StringMap.find class_name class_name_to_decl in
+    List.mem v_name (List.map get_name_of_assign scdecl.sstatic_vars)
+  in
   (* expression builder *)
   let rec build_expr builder v_symbol_tables (exp : sexpr) = match exp with
     _, SIntLiteral(i)      -> L.const_int i32_t i
@@ -104,6 +182,7 @@ let translate sp_units =
   | _, SBoolLiteral(true)  -> L.const_int i1_t 1
   | _, SBoolLiteral(false) -> L.const_int i1_t 0
   | _, SId(id)             -> L.build_load (lookup v_symbol_tables id) id builder
+  | _, SSelf               -> L.build_load (lookup v_symbol_tables "self") "self" builder
   | _, SNullExpr           -> L.const_pointer_null i32_t
   (* Function calls *)
   | typ, SCall(sc) -> (match sc with
@@ -125,8 +204,50 @@ let translate sp_units =
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
           else raise (Failure ("function " ^ func_name ^ " not found"))
-      | _ -> raise (Failure("method calls are not yet implemented"))
+      | SMethodCall(object_name, method_name, expr_list) ->
+          let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
+          let signature = { fs_name = method_name; formal_types = expr_typs } in
+          let class_name = lookup_class_name v_symbol_tables object_name in
+          let class_signatures = StringMap.find class_name class_signature_map in
+          if SignatureMap.mem signature class_signatures then (* is a user defined method *)
+            let object_sexpr = ((A.Class(class_name)), SId(object_name)) in
+            L.build_call (SignatureMap.find signature class_signatures)
+            (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
+            [] (object_sexpr::expr_list)))
+            (if typ = A.Primitive(A.Void) then "" else (class_name ^ "_" ^ method_name ^ "_res"))
+            builder
+          else raise (Failure ("method " ^ method_name ^ " not found on class " ^ class_name))
       )
+  | _, SObjectInstantiation(class_name, expr_list) ->
+    let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
+    let signature = { fs_name = "construct"; formal_types = expr_typs } in
+    let class_signatures = StringMap.find class_name class_signature_map in
+    if SignatureMap.mem signature class_signatures then (* found a valid constructor *)
+      (* first, create an empty struct of the right type. *)
+      (* this is the one place where we DON'T use the pointer version of the struct type *)
+      let struct_malloc = L.build_malloc (* (ltype_of_typ (A.Class(class_name))) *) (StringMap.find class_name class_name_to_named_struct) "" builder in
+      (* then call the constructor to initialize it properly *)
+      ignore (L.build_call (SignatureMap.find signature class_signatures)
+        (Array.of_list (struct_malloc::(List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
+         [] expr_list)))
+        "" builder); struct_malloc  (* We call the constructor function, but return the llvalue for the struct *)
+    else raise (Failure ("constructor function for " ^ class_name ^ " not found"))
+  | _, SObjectVariableAccess((object_name, var_name, is_static)) ->
+     if is_static then
+       (* If this is a static access, then object_name is actually a class_name. This
+          is the case where we access static var x like MyClass.x instead of myinstance.x *)
+       (let class_name = object_name in
+        let static_var_name = get_static_var_name class_name var_name in
+        L.build_load (lookup v_symbol_tables static_var_name) static_var_name builder)
+     else
+       let class_name = lookup_class_name v_symbol_tables object_name in
+       if (is_static_variable class_name var_name) then
+         (let static_var_name = get_static_var_name class_name var_name in
+          L.build_load (lookup v_symbol_tables static_var_name) static_var_name builder)
+       else
+         (let index_in_class = (get_index_in_class class_name var_name) in
+          let gep = L.build_struct_gep (L.build_load (lookup v_symbol_tables object_name) object_name builder) index_in_class var_name builder in
+          L.build_load gep "" builder)
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -251,19 +372,40 @@ let translate sp_units =
            For some reason this works but L.define_global with the RHS does not. *)
         let declared_global = (L.declare_global (ltype_of_typ typ) name the_module) in
         let _ = L.set_initializer (L.const_null (ltype_of_typ typ)) declared_global in
-        ((StringHash.add global_symbol_table name declared_global);
+        ((StringHash.add global_symbol_table name { llvalue = declared_global; typ = typ });
         ignore(L.build_store e' (lookup v_symbol_tables name) builder));
         e'
       else
         (* Build a local. This means allocating space on the stack, and then
            storing the value of the expr there. *)
         let this_scopes_symbol_table = List.hd v_symbol_tables in
-        ((StringHash.add this_scopes_symbol_table name (L.build_alloca (ltype_of_typ typ) name builder));
+        let new_symbol_table_entry = { llvalue = (L.build_alloca (ltype_of_typ typ) name builder); typ = typ } in
+        ((StringHash.add this_scopes_symbol_table name new_symbol_table_entry);
         ignore(L.build_store e' (lookup v_symbol_tables name) builder));
         e'
+  | typ1, SAssign(SStaticAssign(class_name, typ2, var_name, sexpr)) ->
+      (* . can never be part of an identifier in our language, but it can in LLVM.
+         Thus we use the LLVM global name to handle static variables, as the class name
+         basically gives each static var a unique prefix and unique id that won't
+         conflict with other global variables or other class static variables. *)
+      build_expr builder v_symbol_tables (typ1, (SAssign(SRegularAssign(typ2, (get_static_var_name class_name var_name), sexpr))))
   | _, SUpdate(SRegularUpdate(name, A.Eq, sexpr)) ->
       let e' = build_expr builder v_symbol_tables sexpr in
       ignore(L.build_store e' (lookup v_symbol_tables name) builder); e'
+  | typ, SUpdate(SObjectVariableUpdate((object_name, var_name, is_static), A.Eq, sexpr)) ->
+      let e' = build_expr builder v_symbol_tables sexpr in
+      if is_static then
+        let class_name = object_name in
+        let static_var_name = get_static_var_name class_name var_name in
+        build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, sexpr)))
+      else
+        let class_name = lookup_class_name v_symbol_tables object_name in
+        if (is_static_variable class_name var_name) then
+          let static_var_name = get_static_var_name class_name var_name in
+          build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, sexpr)))
+        else
+          (let gep = L.build_struct_gep (L.build_load (lookup v_symbol_tables object_name) object_name builder) (get_index_in_class class_name var_name) var_name builder in
+          ignore(L.build_store e' gep builder); e')
   | _ -> raise (Failure("unimplemented expr in codegen"))
   in
 
@@ -340,45 +482,71 @@ let translate sp_units =
     let merge_bb = L.append_block context "merge" the_function in
     ignore (L.build_cond_br bool_val body_bb merge_bb pred_builder);
     L.builder_at_end context merge_bb
-  | _           -> builder
   and
   build_stmt_list the_function v_symbol_tables builder stmt_list = 
     List.fold_left (build_stmt the_function v_symbol_tables) builder stmt_list
   in
 
-  (* function decleration builder *) 
-  let build_func v_symbol_tables builder (sf : sfdecl) = 
+  (* function declaration builder *)
+  let build_func v_symbol_tables class_name builder (sf : sfdecl) =
     let signature = { fs_name = sf.sfname; formal_types =
       List.fold_left (fun s (typ, _) -> s @ [typ]) [] sf.sformals } in
-    let func = SignatureMap.find signature user_func_map in
+    let func =
+      if class_name = "" then
+        SignatureMap.find signature user_func_map
+      else
+        SignatureMap.find signature (StringMap.find class_name class_signature_map)
+    in
     let func_builder = L.builder_at_end context (L.entry_block func) in
     (* allocs formals in the stack *)
     let alloca_formal s (typ, name) = 
-     s @ [L.build_alloca (ltype_of_typ typ) name func_builder] in
-    let stack_vars = List.fold_left alloca_formal [] sf.sformals in
+      s @ [{ llvalue = (L.build_alloca (ltype_of_typ typ) name func_builder) ; typ = typ }] in
+    let stack_vars =
+      if class_name = "" then
+        List.fold_left alloca_formal [] sf.sformals
+      else
+        let class_typ = (A.Class(class_name)) in
+        let fst_stmt = { llvalue = (L.build_alloca ((ltype_of_typ class_typ)) "self" func_builder); typ = class_typ} in
+        fst_stmt::(List.fold_left alloca_formal [] sf.sformals)
+    in
     (* stores pointers to the stack location of the formal args *)
     let rec store_formals param stack_p = match param, stack_p with
       [], [] -> []
-    | hd1::[], hd2::[] -> [L.build_store hd1 hd2 func_builder]
-    | hd1::tl1, hd2::tl2 -> (L.build_store hd1 hd2 func_builder)::(store_formals tl1 tl2)
+    | hd1::[], hd2::[] -> [L.build_store hd1 hd2.llvalue func_builder]
+    | hd1::tl1, hd2::tl2 -> let fst_stmt = (L.build_store hd1 hd2.llvalue func_builder) in
+                            fst_stmt::(store_formals tl1 tl2)
     | _ -> raise (Failure "store_formals array mismatch!") in
     (* add a new elem in this function's v_symbol_tables and add formals *)
     let this_scopes_symbol_table = StringHash.create 10 in
     let v_symbol_tables = this_scopes_symbol_table::v_symbol_tables in
-    let _ = 
+    let _ =
       ignore (store_formals (Array.to_list (L.params func)) stack_vars);
       List.iter (fun elem -> StringHash.add this_scopes_symbol_table
-                                  (L.value_name elem) elem) stack_vars in
+                                  (L.value_name elem.llvalue) elem) stack_vars in
     let last_builder = List.fold_left (fun builder stmt -> 
            build_stmt func v_symbol_tables builder stmt) func_builder sf.sbody in
-   (* if user didn't specify return on void function, then add it ourselves *) 
+   (* if user didn't specify return on void function, then add it ourselves *)
     let _ = if (sf.srtype = A.Primitive(A.Void)) &&
-           (not (List.mem SReturnVoid sf.sbody)) then
+           (not (List.mem SReturnVoid sf.sbody)) then (* TODO does this need to be updated to be more robust for branches? *)
            ignore (L.build_ret_void last_builder) in
    builder in
 
-  (* class decleration builder *) 
-  let build_class builder (sc : sclassdecl) = builder in
+  (* class declaration builder *)
+  let sassign_to_sexpr = function
+    SRegularAssign(lhs_typ, _, _) as sra -> (lhs_typ, (SAssign(sra)))
+  | SStaticAssign(_, lhs_typ, _, _) as ssa -> (lhs_typ, (SAssign(ssa)))
+  in
+  let build_class v_symbol_tables builder (sc : sclassdecl) =
+    (* First build the struct type in LLVM, this will be important *)
+    (* Classes can have other classes as their fields - these are just pointers *)
+    (* Then loop through all the fdecls, including constructors *)
+    (* loop over all the static vars *)
+    let _ = List.map (build_expr builder v_symbol_tables) (List.map sassign_to_sexpr sc.sstatic_vars) in
+    let _ = (List.fold_left (build_func v_symbol_tables sc.scname) builder sc.smethods) in
+    (* Then make sure myobject.x works *)
+    (* Then make sure self.x works *)
+    builder
+  in
   
   (* LLVM requires a 'main' function as an entry point *)
   let main_t : L.lltype =
@@ -390,8 +558,8 @@ let translate sp_units =
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
     SStmt(ss)       -> build_stmt main_func v_symbol_tables builder ss
-  | SFdecl(sf)      -> build_func v_symbol_tables builder sf
-  | SClassdecl(sc)  -> build_class builder sc in
+  | SFdecl(sf)      -> build_func v_symbol_tables "" builder sf
+  | SClassdecl(sc)  -> build_class v_symbol_tables builder sc in
      
   let final_builder = List.fold_left (build_program [StringHash.create 10]) main_builder sp_units in
   ignore (L.build_ret (L.const_int i32_t 0) final_builder); (* build return for main *)

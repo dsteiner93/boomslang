@@ -1,0 +1,2 @@
+def bar(int a, void b, int c) returns void: # Error: illegal void formal b
+	return

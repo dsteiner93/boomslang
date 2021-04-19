@@ -1,0 +1,3 @@
+int i = 0
+boolean b = true
+b = 48 # Fail: assigning an integer to a bool

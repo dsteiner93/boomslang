@@ -1,0 +1,7 @@
+int a = 1
+float b = 2.12
+
+def foo(int c, float d) returns void:
+	int d = 3
+	float e = 4.12
+	b = b + a # Error: float + int

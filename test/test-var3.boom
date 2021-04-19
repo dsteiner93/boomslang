@@ -1,0 +1,3 @@
+int a = 42
+int a = 53
+println(a)

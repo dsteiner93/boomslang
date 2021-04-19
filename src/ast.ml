@@ -14,7 +14,11 @@ type typ =
 
 type bind = typ * string
 
-type object_variable_access = string * string
+(* The final bool indicates whether this is a static access
+   or not. If true, the first string is the class name.
+   If false, the first string is the object instance name.
+   The second field is the identifier for the variable. *)
+type object_variable_access = string * string * bool
 
 type expr =
   IntLiteral of int
@@ -113,9 +117,10 @@ let string_of_id existing_suffix new_index id_string =
   let suffix = new_suffix existing_suffix new_index in
   ("id" ^ suffix, ["id" ^ suffix ^ " [label=\"id: " ^ id_string ^ "\" fontcolor=red]"])
 
-let string_of_object_variable_access existing_suffix new_index object_variable_access =
-  let suffix = new_suffix existing_suffix new_index in
-  ("obj_var_access" ^ suffix, ["obj_var_access" ^ suffix ^ " [label=\"" ^ (fst object_variable_access) ^ "." ^ (snd object_variable_access) ^"\"]"])
+let string_of_object_variable_access existing_suffix new_index = function
+  (class_or_object_id, var_name, _) ->
+    let suffix = new_suffix existing_suffix new_index in
+    ("obj_var_access" ^ suffix, ["obj_var_access" ^ suffix ^ " [label=\"" ^ (class_or_object_id) ^ "." ^ (var_name) ^"\"]"])
 
 let rec string_of_typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in

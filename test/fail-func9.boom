@@ -1,0 +1,4 @@
+def foo(int a, boolean b) returns void:
+	return
+
+foo(42, 42) # Fail: int, not bool

@@ -1,0 +1,2 @@
+if -3.5 and 2.5: # Float with AND?
+	println("Error")

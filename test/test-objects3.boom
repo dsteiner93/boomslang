@@ -1,0 +1,42 @@
+class MyClassO:
+	#adding some comments
+	static:
+		MyClassT myclass2 = MyClassT(1, MyClassO(), 4)
+		int staticy = 5
+
+	def return_self() returns MyClassO:
+		return self
+
+class MyClassT:
+	required:
+		int q
+		MyClassO other
+
+	optional:
+		int x = 6
+
+	def func(int unused) returns int:
+		if self.x > 5:
+			loop self.x+=1 while self.x<10:
+				println(self.x)
+			return self.x
+		return 10000
+
+def func(int unused) returns int:
+	return 12345
+
+class WeirdClass:
+	required:
+		int x
+	def construct() returns void:
+		println("i forgot to set x - what will happen?")
+		println(self.x)
+
+MyClassO object1 = MyClassO()
+MyClassT object2 = MyClassT(1, object1.return_self())
+println(object2.func(12345))
+MyClassT object3 = object1.myclass2
+println(object3.func(12345))
+
+WeirdClass weird_class = WeirdClass()
+println(weird_class.x)

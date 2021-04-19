@@ -1,0 +1,7 @@
+int a = 1
+boolean b = true
+
+def foo(int c, boolean d) returns void:
+	int d = 3
+	boolean e = false
+	b = b + a # Error: bool + int

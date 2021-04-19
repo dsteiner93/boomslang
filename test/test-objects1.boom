@@ -1,0 +1,54 @@
+class MyClass:
+	#adding some comments
+	required:
+		int one
+		# adding some comments
+		string two
+		MyClass recursive1
+
+	optional: /# more comments #/
+		float three = 3.0
+		float four = 4.0
+		float five  = 5.0 # adding some comments
+		char six = '6'
+		MyClass recursive2 = MyClass() # adding some comments
+
+	def construct(): /# here
+are some more comments designed to be annoying #/
+		println("called custom constructor")
+
+	def to_string() returns string: /#
+ another one #/
+		# adding some comments
+		return "this is my custom tostring"
+# adding some comments
+	def method1(int a, int b, int z) returns int:
+		println("called method1") /#
+
+		more    stupid
+		comments
+		#/
+		int q = a + b + z
+		int z = q
+		return z
+
+	# adding some comments
+	def method2():
+    # adding some comments
+		println("called method2")
+
+println("printing some random stuff")
+MyClass foo = MyClass(1, "two", MyClass())
+println(foo)
+println(foo.one)
+println(foo.two)
+println(foo.three)
+println(foo.four)
+println(foo.five)
+println(foo.six)
+MyClass recursive1 = foo.recursive1
+MyClass recursive2 = foo.recursive2
+println(recursive1)
+println(recursive2.to_string())
+println(foo.method1(1, 2, 3))
+foo.method2()

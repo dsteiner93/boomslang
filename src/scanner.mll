@@ -68,6 +68,7 @@ rule tokenize = parse
 | "<=" { LTE }
 (* Multi-line comments *)
 | ['\n']+[' ' '\t']*"/#" { multi_comment lexbuf }
+| "/#" { multi_comment lexbuf }
 (* Misc. punctuation *)
 | '(' { LPAREN }
 | ')' { RPAREN }
