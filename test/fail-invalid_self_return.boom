@@ -1,4 +1,0 @@
-class MyClass:
-        def foo() returns int:
-                return self
-

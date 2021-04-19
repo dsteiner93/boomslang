@@ -1,4 +1,4 @@
 class MyClass:
-        static:
-                my_object.x = 5
+	static:
+		my_object.x = 5
 
