@@ -297,13 +297,20 @@ let translate sp_units =
   | _, SBinop(((A.Primitive(A.Int), _) as sexpr1), binop, ((A.Primitive(A.Int), _) as sexpr2))
   | _, SBinop(((A.Primitive(A.Long), _) as sexpr1), binop, ((A.Primitive(A.Long), _) as sexpr2)) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
-      and sexpr2' = build_expr builder v_symbol_tables sexpr2 in
+      and sexpr2' = build_expr builder v_symbol_tables sexpr2
+      and sexpr2_val = (snd sexpr2) in
       (match binop with
           A.Plus         -> L.build_add
         | A.Subtract     -> L.build_sub
         | A.Times        -> L.build_mul
-        | A.Divide       -> L.build_sdiv (* signed division*)
-        | A.Modulo       -> L.build_srem (* signed remainder *)
+        | A.Divide       ->
+          if sexpr2_val = SIntLiteral(0) || sexpr2_val = SLongLiteral(0L) then
+            raise (Failure("Cannot divide by 0"))
+          else L.build_sdiv (* signed division*)
+        | A.Modulo       ->
+          if sexpr2_val = SIntLiteral(0) || sexpr2_val = SLongLiteral(0L) then
+            raise (Failure("Cannot divide by 0"))
+          else L.build_srem (* signed remainder *)
         | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (* ordered and equal to *)
         | A.BoGT         -> L.build_icmp L.Icmp.Sgt (* ordered and greater than *)
         | A.BoLT         -> L.build_icmp L.Icmp.Slt (* ordered and less than *)
@@ -314,13 +321,20 @@ let translate sp_units =
   (* Float binops *)
   | _, SBinop(((A.Primitive(A.Float), _) as sexpr1), binop, ((A.Primitive(A.Float), _) as sexpr2)) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
-      and sexpr2' = build_expr builder v_symbol_tables sexpr2 in
+      and sexpr2' = build_expr builder v_symbol_tables sexpr2
+      and sexpr2_val = (snd sexpr2) in
       (match binop with
           A.Plus         -> L.build_fadd
         | A.Subtract     -> L.build_fsub
         | A.Times        -> L.build_fmul
-        | A.Divide       -> L.build_fdiv (* signed division*)
-        | A.Modulo       -> L.build_frem (* signed remainder *)
+        | A.Divide       ->
+          if sexpr2_val = SFloatLiteral("0") then
+            raise (Failure("Cannot divide by 0"))
+          else L.build_fdiv (* signed division*)
+        | A.Modulo       ->
+          if sexpr2_val = SFloatLiteral("0") then
+            raise (Failure("Cannot divide by 0"))
+          else L.build_frem (* signed remainder *)
         | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (* ordered and equal to *)
         | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (* ordered and greater than *)
         | A.BoLT         -> L.build_fcmp L.Fcmp.Olt (* ordered and less than *)

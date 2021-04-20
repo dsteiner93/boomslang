@@ -1,8 +1,13 @@
 int x = 2
+int y = 3
+int z = 4
 x = x+0
 println(x)
 x = x-0
 println(x)
 x = x*0
 println(x)
-
+y = 0*y
+println(y)
+z = 0/z
+println(z)
