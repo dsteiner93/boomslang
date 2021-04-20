@@ -195,6 +195,9 @@ array_literal:
   LBRACKET params RBRACKET { ArrayLiteral (List.rev $2) }
 | LBRACKET RBRACKET { ArrayLiteral ([]) }
 
+array_default:
+  typ IDENTIFIER EQ typ { ArraySetDefault($1, $2, $4) }
+
 typ:
   INT { Primitive Int }
 | LONG { Primitive Long }
@@ -221,6 +224,7 @@ expr:
 | object_variable_access { ObjectVariableAccess $1 }
 | array_access { ArrayAccess $1 }
 | array_literal { $1 }
+| array_default { $1 }
 | LPAREN expr RPAREN { $2 }
 | expr PLUS expr { Binop ($1, Plus, $3) }
 | expr MINUS expr { Binop ($1, Subtract, $3) }

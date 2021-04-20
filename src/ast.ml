@@ -35,6 +35,7 @@ type expr =
 | ObjectVariableAccess of object_variable_access
 | ArrayAccess of array_access
 | ArrayLiteral of expr list
+| ArraySetDefault of typ * string * typ
 | Binop of expr * binop * expr
 | Unop of unaryop * expr
 | Assign of assign
@@ -79,7 +80,6 @@ type p_unit =
 | Classdecl of classdecl
 
 type program = p_unit list
-
 
 (* Begin visualization functions *)
 let rec mapiplus i f = function

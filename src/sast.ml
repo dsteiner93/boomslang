@@ -18,6 +18,7 @@ and sx =
 | SObjectVariableAccess of object_variable_access
 | SArrayAccess of sarray_access
 | SArrayLiteral of sexpr list
+| SArraySetDefault of string
 | SBinop of sexpr * binop * sexpr
 | SUnop of unaryop * sexpr
 | SAssign of sassign
@@ -180,4 +181,3 @@ let string_of_sprogram sprogram = (* Takes a program object and returns a Tuple<
 
 let graphviz_string_of_sprogram sprogram =
   "digraph G { \n" ^ (String.concat "\n" (snd (string_of_sprogram sprogram))) ^ "\n}"
-
