@@ -474,7 +474,7 @@ check_binop_coerced checked_lhs binop checked_rhs =
       | Primitive(Char) -> (Primitive(String), SBinop((wrap_to_string [checked_lhs]), binop, (wrap_to_string [checked_rhs])))
       | _ -> raise (Failure("Binop + is not available for type " ^ (str_of_typ lhs_type))))
 
-      | Subtract | Times | Divide | Modulo -> (match lhs_type with
+    | Subtract | Times | Divide | Modulo -> (match lhs_type with
         Primitive(Int) | Primitive(Long) | Primitive(Float) -> (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
       | _ -> raise (Failure("Binops -, *, /, and % are not available for type " ^ (str_of_typ lhs_type))))
 
