@@ -15,7 +15,7 @@ and sx =
 | SNullExpr
 | SCall of scall
 | SObjectInstantiation of string * sexpr list
-| SObjectVariableAccess of object_variable_access
+| SObjectVariableAccess of sobject_variable_access
 | SArrayAccess of sarray_access
 | SArrayLiteral of sexpr list
 | SBinop of sexpr * binop * sexpr
@@ -25,7 +25,7 @@ and sx =
 and sarray_access = string * sexpr
 and scall =
   SFuncCall of string * sexpr list
-| SMethodCall of string * string * sexpr list
+| SMethodCall of sexpr * string * sexpr list
 and sassign =
   SRegularAssign of typ * string * sexpr
 (* These look similar, but will be treated differently in codegen.
@@ -35,8 +35,14 @@ and sassign =
 | SStaticAssign of string * typ * string * sexpr
 and supdate =
   SRegularUpdate of string * updateop * sexpr
-| SObjectVariableUpdate of object_variable_access * updateop * sexpr
+| SObjectVariableUpdate of sobject_variable_access * updateop * sexpr
 | SArrayAccessUpdate of sarray_access * updateop * sexpr
+and sobject_variable_access = {
+  sova_sexpr: sexpr;
+  sova_class_name: string;
+  sova_var_name: string;
+  sova_is_static: bool;
+}
 
 type sstmt =
   SExpr of sexpr
@@ -117,7 +123,7 @@ let rec string_of_sexpr existing_suffix new_index sexpr =
 | SSelf -> string_of_id_typ suffix 0 "self" typ
 | SCall(scall) -> string_of_scall typ suffix 0 scall
 | SObjectInstantiation(id_string, sexprs) -> combine_list_typ "object_instantiation" suffix ([string_of_id_typ suffix 0 id_string typ] @ (mapiplus 1 (string_of_sexpr suffix) sexprs)) typ
-| SObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
+| SObjectVariableAccess(sobject_variable_access) -> string_of_sobject_variable_access suffix 0 sobject_variable_access
 | SArrayAccess(sarray_access) -> string_of_sarray_access suffix 0 sarray_access typ
 | SArrayLiteral(sexprs) -> get_multi_node_generator_typ "array_literal" suffix string_of_sexpr sexprs typ
 | SBinop(sexpr1, binop, sexpr2) -> combine_list_typ "binop" suffix ([string_of_sexpr suffix 0 sexpr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_sexpr suffix 2 sexpr2]) typ
@@ -133,7 +139,7 @@ and string_of_scall typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   SFuncCall(id_string, sexprs) -> combine_list_typ "func_call" suffix ([string_of_id suffix 0 id_string] @ (mapiplus 1 (string_of_sexpr suffix) sexprs)) typ
-| SMethodCall(id1, id2, sexprs) -> combine_list_typ "method_call" suffix ([string_of_id suffix 0 id1] @ [string_of_id suffix 1 id2] @ (mapiplus 2 (string_of_sexpr suffix) sexprs)) typ
+| SMethodCall(sexpr1, id2, sexprs) -> combine_list_typ "method_call" suffix ([string_of_sexpr suffix 0 sexpr1] @ [string_of_id suffix 1 id2] @ (mapiplus 2 (string_of_sexpr suffix) sexprs)) typ
 and string_of_sassign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -143,8 +149,15 @@ and string_of_supdate typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   SRegularUpdate(id_string, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_id_typ suffix 0 id_string typ] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
-| SObjectVariableUpdate(object_variable_access, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_object_variable_access suffix 0 object_variable_access] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
+| SObjectVariableUpdate(sobject_variable_access, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_sobject_variable_access suffix 0 sobject_variable_access] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
 | SArrayAccessUpdate(sarray_access, updateop, sexpr) -> combine_list_typ "update" suffix ([string_of_sarray_access suffix 0 sarray_access typ] @ [string_of_updateop suffix 1 updateop] @ [string_of_sexpr suffix 2 sexpr]) typ
+and string_of_sobject_variable_access existing_suffix new_index = function
+  { sova_class_name = class_name; sova_var_name = var_name; sova_is_static = true; _ } ->
+    let suffix = new_suffix existing_suffix new_index in
+    ("static_var_access" ^ suffix, ["static_var_access" ^ suffix ^ " [label=\"" ^ (class_name) ^ "." ^ (var_name) ^"\"]"])
+| { sova_sexpr = sexpr; sova_var_name = var_name; sova_is_static = false; _ } ->
+    let suffix = new_suffix existing_suffix new_index in
+    combine_list "obj_var_access" suffix ([string_of_sexpr suffix 0 sexpr] @ [string_of_id suffix 1 var_name])
 
 let rec string_of_sstmt existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in

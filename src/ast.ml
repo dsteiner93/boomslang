@@ -14,12 +14,6 @@ type typ =
 
 type bind = typ * string
 
-(* The final bool indicates whether this is a static access
-   or not. If true, the first string is the class name.
-   If false, the first string is the object instance name.
-   The second field is the identifier for the variable. *)
-type object_variable_access = string * string * bool
-
 type expr =
   IntLiteral of int
 | LongLiteral of int64
@@ -42,13 +36,19 @@ type expr =
 and array_access = string * expr
 and call =
   FuncCall of string * expr list (* my_func(1, 2, 3) *)
-| MethodCall of string * string * expr list (* object.identifier(params) *)
+| MethodCall of expr * string * expr list (* expr.identifier(params) *)
 and assign =
   RegularAssign of typ * string * expr
 and update =
   RegularUpdate of string * updateop * expr
 | ObjectVariableUpdate of object_variable_access * updateop * expr
 | ArrayAccessUpdate of array_access * updateop * expr
+and object_variable_access = {
+  ova_expr: expr;
+  ova_class_name: string;
+  ova_var_name: string;
+  ova_is_static: bool;
+}
 
 type stmt =
   Expr of expr
@@ -117,11 +117,6 @@ let string_of_id existing_suffix new_index id_string =
   let suffix = new_suffix existing_suffix new_index in
   ("id" ^ suffix, ["id" ^ suffix ^ " [label=\"id: " ^ id_string ^ "\" fontcolor=red]"])
 
-let string_of_object_variable_access existing_suffix new_index = function
-  (class_or_object_id, var_name, _) ->
-    let suffix = new_suffix existing_suffix new_index in
-    ("obj_var_access" ^ suffix, ["obj_var_access" ^ suffix ^ " [label=\"" ^ (class_or_object_id) ^ "." ^ (var_name) ^"\"]"])
-
 let rec string_of_typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -169,7 +164,7 @@ and string_of_call existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
   FuncCall(id_string, exprs) -> combine_list "func_call" suffix ([string_of_id suffix 0 id_string] @ (mapiplus 1 (string_of_expr suffix) exprs))
-| MethodCall(id1, id2, exprs) -> combine_list "method_call" suffix ([string_of_id suffix 0 id1] @ [string_of_id suffix 1 id2] @ (mapiplus 2 (string_of_expr suffix) exprs))
+| MethodCall(expr1, id2, exprs) -> combine_list "method_call" suffix ([string_of_expr suffix 0 expr1] @ [string_of_id suffix 1 id2] @ (mapiplus 2 (string_of_expr suffix) exprs))
 and string_of_assign existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
@@ -204,6 +199,13 @@ and string_of_unaryop existing_suffix new_index =
   function
   Not -> ("not" ^ suffix, [get_op_node_label "not" suffix "not"])
 | Neg -> ("neg" ^ suffix, [get_op_node_label "neg" suffix "-"])
+and string_of_object_variable_access existing_suffix new_index = function
+  { ova_class_name = class_name; ova_var_name = var_name; ova_is_static = true; _ } ->
+    let suffix = new_suffix existing_suffix new_index in
+    ("static_var_access" ^ suffix, ["static_var_access" ^ suffix ^ " [label=\"" ^ (class_name) ^ "." ^ (var_name) ^"\"]"])
+| { ova_expr = expr; ova_var_name = var_name; ova_is_static = false; _ } ->
+    let suffix = new_suffix existing_suffix new_index in
+    combine_list "obj_var_access" suffix ([string_of_expr suffix 0 expr] @ [string_of_id suffix 1 var_name])
 
 let rec string_of_stmt existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in

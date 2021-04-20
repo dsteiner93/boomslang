@@ -18,7 +18,8 @@ module S = Semant
 open Sast 
 
 module StringMap = Map.Make(String)
-module SignatureMap = Map.Make(struct type t = function_signature let compare = compare end)
+(*module SignatureMap = Map.Make(struct type t = function_signature let compare = compare end)*)
+module SignatureMap = S.SignatureMap
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
   let equal x y = x = y (* use structural comparison *)
@@ -45,6 +46,11 @@ let rec lookup_class_name v_symbol_tables s =
               with Not_found -> (lookup_class_name tl s)
 
 let get_static_var_name class_name var_name = class_name ^ "." ^ var_name
+
+let get_class_name kind v_symbol_tables = function
+  (_, SSelf) -> lookup_class_name v_symbol_tables "self"
+| (A.Class(class_name), _) -> class_name
+| _ -> raise (Failure("The LHS expression of a " ^ kind ^ " is expected to be a class type."))
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
@@ -183,45 +189,46 @@ let translate sp_units =
   | _, SBoolLiteral(false) -> L.const_int i1_t 0
   | _, SId(id)             -> L.build_load (lookup v_symbol_tables id) id builder
   | _, SSelf               -> L.build_load (lookup v_symbol_tables "self") "self" builder
-  | _, SNullExpr           -> L.const_pointer_null i32_t
+  | typ, SNullExpr         -> L.const_pointer_null (ltype_of_typ typ)
   (* Function calls *)
   | typ, SCall(sc) -> (match sc with
       (* Nulls must be handled with care *)
         SFuncCall("null_to_string", [(A.NullType, _)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
-          let signature = { fs_name = func_name; formal_types = expr_typs } in
-          if SignatureMap.mem signature built_in_map then (* is a built in func *)
-            L.build_call (SignatureMap.find signature built_in_map)
+          let signature_with_possible_nulls = { fs_name = func_name; formal_types = expr_typs } in
+          if SignatureMap.mem signature_with_possible_nulls built_in_map then (* is a built in func *)
+            L.build_call (SignatureMap.find signature_with_possible_nulls built_in_map)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
-          else if SignatureMap.mem signature user_func_map then (* is a user defined func *)
-            L.build_call (SignatureMap.find signature user_func_map)
+          else (* is a user defined func *)
+            let matching_signature = S.find_matching_signature signature_with_possible_nulls user_func_map in
+            L.build_call (SignatureMap.find matching_signature user_func_map)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
             builder
-          else raise (Failure ("function " ^ func_name ^ " not found"))
-      | SMethodCall(object_name, method_name, expr_list) ->
+      | SMethodCall(expr, method_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
-          let signature = { fs_name = method_name; formal_types = expr_typs } in
-          let class_name = lookup_class_name v_symbol_tables object_name in
+          let signature_with_possible_nulls = { fs_name = method_name; formal_types = expr_typs } in
+          let class_name = get_class_name "method call" v_symbol_tables expr in
           let class_signatures = StringMap.find class_name class_signature_map in
+          let signature = S.find_matching_signature signature_with_possible_nulls class_signatures in
           if SignatureMap.mem signature class_signatures then (* is a user defined method *)
-            let object_sexpr = ((A.Class(class_name)), SId(object_name)) in
             L.build_call (SignatureMap.find signature class_signatures)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
-            [] (object_sexpr::expr_list)))
+            [] (expr::expr_list)))
             (if typ = A.Primitive(A.Void) then "" else (class_name ^ "_" ^ method_name ^ "_res"))
             builder
           else raise (Failure ("method " ^ method_name ^ " not found on class " ^ class_name))
       )
   | _, SObjectInstantiation(class_name, expr_list) ->
     let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
-    let signature = { fs_name = "construct"; formal_types = expr_typs } in
+    let signature_with_possible_nulls = { fs_name = "construct"; formal_types = expr_typs } in
     let class_signatures = StringMap.find class_name class_signature_map in
+    let signature = S.find_matching_signature signature_with_possible_nulls class_signatures in
     if SignatureMap.mem signature class_signatures then (* found a valid constructor *)
       (* first, create an empty struct of the right type. *)
       (* this is the one place where we DON'T use the pointer version of the struct type *)
@@ -232,21 +239,24 @@ let translate sp_units =
          [] expr_list)))
         "" builder); struct_malloc  (* We call the constructor function, but return the llvalue for the struct *)
     else raise (Failure ("constructor function for " ^ class_name ^ " not found"))
-  | _, SObjectVariableAccess((object_name, var_name, is_static)) ->
+  | _, SObjectVariableAccess(sova) ->
+     let expr = sova.sova_sexpr in
+     let class_name = sova.sova_class_name in
+     let var_name = sova.sova_var_name in
+     let is_static = sova.sova_is_static in
      if is_static then
-       (* If this is a static access, then object_name is actually a class_name. This
-          is the case where we access static var x like MyClass.x instead of myinstance.x *)
-       (let class_name = object_name in
-        let static_var_name = get_static_var_name class_name var_name in
+       (* This is the case where we access static var x like MyClass.x instead of myinstance.x *)
+       (let static_var_name = get_static_var_name class_name var_name in
         L.build_load (lookup v_symbol_tables static_var_name) static_var_name builder)
      else
-       let class_name = lookup_class_name v_symbol_tables object_name in
+       let class_name = get_class_name "object variable access" v_symbol_tables expr in
        if (is_static_variable class_name var_name) then
          (let static_var_name = get_static_var_name class_name var_name in
           L.build_load (lookup v_symbol_tables static_var_name) static_var_name builder)
        else
          (let index_in_class = (get_index_in_class class_name var_name) in
-          let gep = L.build_struct_gep (L.build_load (lookup v_symbol_tables object_name) object_name builder) index_in_class var_name builder in
+          let expr' = build_expr builder v_symbol_tables expr in
+          let gep = L.build_struct_gep expr' index_in_class var_name builder in
           L.build_load gep "" builder)
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
@@ -392,20 +402,24 @@ let translate sp_units =
   | _, SUpdate(SRegularUpdate(name, A.Eq, sexpr)) ->
       let e' = build_expr builder v_symbol_tables sexpr in
       ignore(L.build_store e' (lookup v_symbol_tables name) builder); e'
-  | typ, SUpdate(SObjectVariableUpdate((object_name, var_name, is_static), A.Eq, sexpr)) ->
-      let e' = build_expr builder v_symbol_tables sexpr in
+  | typ, SUpdate(SObjectVariableUpdate(sova, A.Eq, rhs_sexpr)) ->
+      let lhs_sexpr = sova.sova_sexpr in
+      let class_name = sova.sova_class_name in
+      let var_name = sova.sova_var_name in
+      let is_static = sova.sova_is_static in
+      let rhs_expr' = build_expr builder v_symbol_tables rhs_sexpr in
+      let lhs_expr' = build_expr builder v_symbol_tables lhs_sexpr in
       if is_static then
-        let class_name = object_name in
         let static_var_name = get_static_var_name class_name var_name in
-        build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, sexpr)))
+        build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, rhs_sexpr)))
       else
-        let class_name = lookup_class_name v_symbol_tables object_name in
+        let class_name = get_class_name "object variable update" v_symbol_tables lhs_sexpr in
         if (is_static_variable class_name var_name) then
           let static_var_name = get_static_var_name class_name var_name in
-          build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, sexpr)))
+          build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, rhs_sexpr)))
         else
-          (let gep = L.build_struct_gep (L.build_load (lookup v_symbol_tables object_name) object_name builder) (get_index_in_class class_name var_name) var_name builder in
-          ignore(L.build_store e' gep builder); e')
+          (let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
+          ignore(L.build_store rhs_expr' gep builder); rhs_expr')
   | _ -> raise (Failure("unimplemented expr in codegen"))
   in
 

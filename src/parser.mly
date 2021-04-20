@@ -43,7 +43,9 @@ open Ast
 %left PLUS MINUS
 %left TIMES DIVIDE MODULO
 %left OBJ_OPERATOR
+%left PERIOD
 %nonassoc UNARY_MINUS
+%nonassoc FIELD
 
 %start program /* the entry point */
 %type <Ast.program> program
@@ -171,22 +173,19 @@ assign_update:
 | array_access DIVIDE_EQ expr { ArrayAccessUpdate ($1, Eq, Binop(ArrayAccess($1), Divide, $3)) }
 
 func_call:
-  IDENTIFIER PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ($1, $3, List.rev $5) }
-| SELF PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ("self", $3, List.rev $5) }
+  expr PERIOD IDENTIFIER LPAREN params RPAREN { MethodCall ($1, $3, List.rev $5) }
 | IDENTIFIER LPAREN params RPAREN { FuncCall ($1, List.rev $3) }
-| IDENTIFIER PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ($1, $3, []) }
-| SELF PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ("self", $3, []) }
+| expr PERIOD IDENTIFIER LPAREN RPAREN { MethodCall ($1, $3, []) }
 | IDENTIFIER LPAREN RPAREN { FuncCall ($1, []) }
-| IDENTIFIER OBJ_OPERATOR expr { MethodCall ($1, "_" ^ $2, [$3]) }
+| expr OBJ_OPERATOR expr { MethodCall ($1, "_" ^ $2, [$3]) }
 
 object_instantiation:
   CLASS_NAME LPAREN params RPAREN { ObjectInstantiation ($1, List.rev $3) }
 | CLASS_NAME LPAREN RPAREN { ObjectInstantiation ($1, []) }
 
 object_variable_access:
-  IDENTIFIER PERIOD IDENTIFIER { ($1, $3, false) }
-| SELF PERIOD IDENTIFIER { ("self", $3, false) }
-| CLASS_NAME PERIOD IDENTIFIER { ($1, $3, true) }
+  expr PERIOD IDENTIFIER { { ova_expr = $1; ova_class_name = ""; ova_var_name = $3; ova_is_static = false; } }
+| CLASS_NAME PERIOD IDENTIFIER { { ova_expr = NullExpr; ova_class_name = $1; ova_var_name =  $3; ova_is_static = true } }
 
 array_access:
   IDENTIFIER LBRACKET expr RBRACKET { ($1, $3) }
