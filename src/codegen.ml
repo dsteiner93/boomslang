@@ -193,7 +193,7 @@ let translate sp_units =
   (* Function calls *)
   | typ, SCall(sc) -> (match sc with
       (* Nulls must be handled with care *)
-        SFuncCall("null_to_string", [(A.NullType, _)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
+        SFuncCall("null_to_string", [(_, SNullExpr)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
           let signature_with_possible_nulls = { fs_name = func_name; formal_types = expr_typs } in
@@ -263,17 +263,20 @@ let translate sp_units =
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
       and sexpr2' = build_expr builder v_symbol_tables sexpr2 in
       let sexpr1typ = (fst sexpr1)
-      and sexpr2typ = (fst sexpr2) in
-      if ((sexpr1typ = A.NullType) && (sexpr2typ = A.NullType)) then
+      and sexpr2typ = (fst sexpr2)
+      and sexpr1sx = (snd sexpr1)
+      and sexpr2sx = (snd sexpr2)
+      in
+      if ((sexpr1typ = A.NullType || sexpr1sx = SNullExpr) && (sexpr2typ = A.NullType || sexpr2sx = SNullExpr)) then
         (get_lvalue_of_bool true)
-      else if (sexpr1typ = A.NullType) then
+      else if (sexpr1typ = A.NullType || sexpr1sx = SNullExpr) then
         (* Only an object (not a primitive nor array) may be Null. *)
         (match sexpr2typ with
-             A.Class(_) -> get_lvalue_of_bool (L.is_null sexpr2')
+             A.Class(_) -> L.build_is_null sexpr2' "" builder
            | _ -> L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
-      else if (sexpr2typ = A.NullType) then
+      else if (sexpr2typ = A.NullType || sexpr2sx = SNullExpr) then
         (match sexpr1typ with
-             A.Class(_) -> get_lvalue_of_bool (L.is_null sexpr1')
+             A.Class(_) -> L.build_is_null sexpr1' "" builder
            | _ -> L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
       else
         (match sexpr1typ with
@@ -291,6 +294,7 @@ let translate sp_units =
               L.build_call (SignatureMap.find signature built_in_map)
                 (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
                 (signature.fs_name ^ "_res") builder
+          | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder (* TODO this is just a placeholder *)
           | _ -> raise (Failure("TODO implement equality checks for arrays and classes"))
         )
   (* Integer and long binops *)
@@ -553,12 +557,10 @@ let translate sp_units =
   let build_class v_symbol_tables builder (sc : sclassdecl) =
     (* First build the struct type in LLVM, this will be important *)
     (* Classes can have other classes as their fields - these are just pointers *)
-    (* Then loop through all the fdecls, including constructors *)
     (* loop over all the static vars *)
     let _ = List.map (build_expr builder v_symbol_tables) (List.map sassign_to_sexpr sc.sstatic_vars) in
+    (* Then loop through all the fdecls, including constructors *)
     let _ = (List.fold_left (build_func v_symbol_tables sc.scname) builder sc.smethods) in
-    (* Then make sure myobject.x works *)
-    (* Then make sure self.x works *)
     builder
   in
   

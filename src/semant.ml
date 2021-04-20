@@ -57,6 +57,16 @@ let find_matching_signature signature signatures =
     raise (Failure("The call to " ^ signature.fs_name ^ " is ambiguous."))
   else List.hd matching_signatures_list
 
+(* If the user is calling a function with NULLs as parameters, we need to
+   convert the type associated with the NullExpr to the type of the formal
+   that is expected. This will help LLVM generate the right kind of null
+   pointer. *)
+let convert_nulls_in_checked_exprs checked_exprs matching_signature =
+  let convert checked_expr typ = match (fst checked_expr) with
+    NullType -> (typ, (snd checked_expr))
+  | _ -> checked_expr in
+  List.map2 convert checked_exprs matching_signature.formal_types
+
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong. *)
 
@@ -104,7 +114,7 @@ let wrap_to_string checked_exprs = match checked_exprs with
 | [(Primitive(Float), _)] -> (Primitive(String), SCall(SFuncCall("float_to_string", checked_exprs)))
 | [(Primitive(Char), _)] -> (Primitive(String), SCall(SFuncCall("char_to_string", checked_exprs)))
 | [(Primitive(Bool), _)] -> (Primitive(String), SCall(SFuncCall("bool_to_string", checked_exprs)))
-| [(NullType, _)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
+| [(_, SNullExpr)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
 | [(Class(_), _) as sexpr] -> (Primitive(String), SCall(SMethodCall(sexpr, "to_string", [])))
 | _ -> raise (Failure("Expected exactly 1 expression of a non-void primitive, null, or named object type."))
 in
@@ -234,7 +244,8 @@ let rec check_fcall fname actuals v_symbol_tables =
     if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, wrapped_checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
   else
     let matching_signature = find_matching_signature signature function_signatures in
-    ((SignatureMap.find matching_signature function_signatures), SCall (SFuncCall(fname, checked_exprs)))
+    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+    ((SignatureMap.find matching_signature function_signatures), SCall (SFuncCall(fname, null_safe_checked_exprs)))
 and
 
 check_mcall expr fname actuals v_symbol_tables =
@@ -248,7 +259,8 @@ check_mcall expr fname actuals v_symbol_tables =
     let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
     let signature = { fs_name = fname; formal_types = List.map (fst) checked_exprs } in
     let matching_signature = find_matching_signature signature class_function_signatures in
-    ((SignatureMap.find matching_signature class_function_signatures), SCall (SMethodCall(checked_expr, fname, checked_exprs)))
+    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+    ((SignatureMap.find matching_signature class_function_signatures), SCall (SMethodCall(checked_expr, fname, null_safe_checked_exprs)))
   | _ -> raise (Failure(("Attempted to call method on something that was not a class")))
 and
 
@@ -325,11 +337,13 @@ check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
+  let _ = (match lhs_type with Class(class_name) -> (check_class_exists class_name) | _ -> ()) in
   match lhs_type with
     Array(lhs_element_type, lhs_size) -> check_array_assign lhs_name lhs_element_type lhs_size this_scopes_v_table checked_expr
   | _ ->
     if (rhs_type = lhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-      ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
+      let converted_null = (lhs_type, (snd checked_expr)) in
+      ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_null)))
     else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
       let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
       ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, (converter [checked_expr]))))
@@ -349,7 +363,8 @@ check_regular_update id updateop rhs_expr v_symbol_tables =
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SRegularUpdate(id, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SRegularUpdate(id, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, (converter [checked_expr]))))
@@ -369,7 +384,8 @@ check_object_variable_update object_variable_access updateop rhs_expr v_symbol_t
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SObjectVariableUpdate(sova, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SObjectVariableUpdate(sova, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SObjectVariableUpdate(sova, updateop, (converter [checked_expr]))))
@@ -385,7 +401,8 @@ check_array_access_update array_access updateop rhs_expr v_symbol_tables =
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SArrayAccessUpdate(sarray_access, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SArrayAccessUpdate(sarray_access, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, (converter [checked_expr]))))
@@ -432,7 +449,11 @@ check_array_literal exprs v_symbol_tables =
   let _ = check_exprs_have_same_type checked_exprs in
   let non_null_list = List.filter (function p -> p <> NullType) (List.map fst checked_exprs) in
   let element_typ = if List.length non_null_list > 0 then (List.hd non_null_list) else NullType in
-  let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral checked_exprs))
+  let convert_null typ checked_expr = match (fst checked_expr) with
+    NullType -> (typ, (snd checked_expr))
+  | _ -> checked_expr in
+  let null_safe_checked_exprs = List.map (convert_null element_typ) checked_exprs in
+  let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral null_safe_checked_exprs))
 and
 
 check_unop unaryop expr v_symbol_tables =
@@ -508,8 +529,9 @@ check_object_instantiation class_name exprs v_symbol_tables =
     (* See if there is a constructor matching this signature *)
     let signatures_in_class = StringMap.find class_name class_signatures in
     let signature = { fs_name = "construct"; formal_types = List.map fst checked_exprs } in
-    try (let _ = find_matching_signature signature signatures_in_class in
-      (Class(class_name), SObjectInstantiation(class_name, checked_exprs)))
+    try (let matching_signature = find_matching_signature signature signatures_in_class in
+      let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+      (Class(class_name), SObjectInstantiation(class_name, null_safe_checked_exprs)))
     with Failure(_) -> (raise (Failure("Attempted to initialize class " ^ class_name ^ " using a type signature that has no associated constructor.")))
   else raise (Failure("Attempted to initialize class " ^ class_name ^ " that does not exist."))
 and
