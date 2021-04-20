@@ -267,10 +267,6 @@ let translate sp_units =
               "ep" builder) builder; i + 1) 0 llvalue_arr in
       arrp
 
-
-
-
-
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -390,11 +386,6 @@ let translate sp_units =
         ((StringHash.add this_scopes_symbol_table name new_symbol_table_entry);
         ignore(L.build_store arrp (lookup v_symbol_tables name) builder));
         arrp
-
-
-
-
-
   | _, SAssign(SRegularAssign(typ, name, sexpr)) ->
       (* Variables outside of classes and functions should be globals,
          those inside functions and classes should be locals.

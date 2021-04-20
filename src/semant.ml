@@ -291,6 +291,9 @@ and
 check_array_assign lhs_name lhs_element_type lhs_size this_scopes_v_table checked_expr =
   (* *_type is always like Array(Int, 5). *_element_type is the type of the element
      making up the array, e.g. Int *)
+  let _ = match lhs_element_type with (* if defining an object array, make sure class is defined *)
+    Class(name) -> check_class_exists name 
+  | _           -> () in
   let lhs_type = Array(lhs_element_type, lhs_size) in
   let rhs_type = (fst checked_expr) in
   match rhs_type with
