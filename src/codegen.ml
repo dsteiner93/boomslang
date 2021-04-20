@@ -83,6 +83,7 @@ let translate sp_units =
   (* Classes, arrays, and null type *)
   (* Classes always get passed around as pointers to the memory where the full struct is stored *)
   | A.Class(class_name)   -> L.pointer_type (StringMap.find class_name class_name_to_named_struct)
+  | A.Array(typ, size)    -> L.pointer_type (L.array_type (ltype_of_typ typ) size)
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
