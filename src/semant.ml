@@ -428,12 +428,9 @@ check_array_literal exprs v_symbol_tables =
   let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral checked_exprs))
 and
 
-check_set_array_default lhs_typ name rhs_typ v_symbol_tables = match lhs_typ, rhs_typ with
-  Array(_), Array(_) -> if lhs_typ = rhs_typ then 
-                         lhs_typ, SArraySetDefault(name)
-                        else
-                         raise (Failure ("Default array declaration has incompatible types"))
-| _                  -> raise (Failure ("Attempted to initialize variable to a type"))
+check_default_array typ = match typ with
+  Array(_) -> typ, SDefaultArray
+| _        -> raise (Failure ("Attempted to create a default non-array type"))
 and
 
 check_unop unaryop expr v_symbol_tables =
@@ -530,7 +527,7 @@ check_expr v_symbol_tables = function
 | ObjectVariableAccess(object_variable_access) -> check_object_variable_access v_symbol_tables object_variable_access
 | ArrayAccess(array_name, expr) -> check_array_access array_name expr v_symbol_tables
 | ArrayLiteral(exprs) -> check_array_literal exprs v_symbol_tables
-| ArraySetDefault(lhs_typ, name, rhs_typ) -> check_set_array_default lhs_typ name rhs_typ v_symbol_tables
+| DefaultArray(typ) -> check_default_array typ
 | Binop(lhs_expr, binop, rhs_expr) -> check_binop lhs_expr binop rhs_expr v_symbol_tables
 | Unop(unaryop, expr) -> check_unop unaryop expr v_symbol_tables
 | Assign(assign) ->

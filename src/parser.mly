@@ -22,6 +22,8 @@ open Ast
 %token LPAREN RPAREN LBRACKET RBRACKET COLON PERIOD COMMA UNDERSCORE
 /* Syntactically significant whitespace */
 %token NEWLINE INDENT DEDENT EOF
+/* Misc. Keywords */
+%token DEFAULT
 /* Parameterized tokens */
 %token <int> INT_LITERAL
 %token <int64> LONG_LITERAL
@@ -196,7 +198,7 @@ array_literal:
 | LBRACKET RBRACKET { ArrayLiteral ([]) }
 
 array_default:
-  typ IDENTIFIER EQ typ { ArraySetDefault($1, $2, $4) }
+  DEFAULT typ { DefaultArray ($2) }
 
 typ:
   INT { Primitive Int }

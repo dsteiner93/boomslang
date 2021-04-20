@@ -103,6 +103,30 @@ let translate sp_units =
   | false -> (L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
   in
 
+  (* define the default values for all the types *)
+  let rec default_val_of_typ typ builder = match typ with
+    A.Primitive(A.Int)    -> L.const_int i32_t 0
+  | A.Primitive(A.Long)   -> L.const_int i64_t 0
+  | A.Primitive(A.Float)  -> L.const_float float_t 0.0
+  | A.Primitive(A.Char)   -> L.const_int i8_t 0
+  | A.Primitive(A.String) -> L.build_global_stringptr "" "" builder
+  | A.Primitive(A.Bool)   -> L.const_int i1_t 0
+  | A.Class(_)            -> raise (Failure ("NULLs not implemented yet"))
+  | A.Array(typ, size)    -> 
+      let default = default_val_of_typ typ builder in
+      (* always put the array literal in the heap, maybe find a way to free this memory later *)
+      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) size) "arrp" builder  in
+      (* for each element of the array, set the value to the default value *)
+      let _ = 
+        let rec helper i =
+         if i = size then ()
+         else (
+          ignore (L.build_store default (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] "" builder) builder);
+          helper (i + 1)) in
+        helper 0 in arrp
+  | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
+  in
+
   (* create a map of all of the built in functions *)
   let built_in_map =
    let built_in_funcs : (string * A.typ * (A.typ list)) list =
@@ -250,7 +274,7 @@ let translate sp_units =
          (let index_in_class = (get_index_in_class class_name var_name) in
           let gep = L.build_struct_gep (L.build_load (lookup v_symbol_tables object_name) object_name builder) index_in_class var_name builder in
           L.build_load gep "" builder)
-  | typ, SArrayAccess(name, sexpr) ->
+  | _, SArrayAccess(name, sexpr) ->
       let n = build_expr builder v_symbol_tables sexpr in (* the integer (as an llvalue) we are indexing to *)
       let arr = L.build_load (lookup v_symbol_tables name) ("stored_" ^ name) builder in
       let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "gep_of_arr" builder in
@@ -263,10 +287,11 @@ let translate sp_units =
       let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "arrp" builder  in
       (* for each element of the array, gep and store value *)
       let _ = List.fold_left 
-              (fun i e -> L.build_store e (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] 
-              "ep" builder) builder; i + 1) 0 llvalue_arr in
+              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] 
+              "" builder) builder); i + 1) 0 llvalue_arr in
       arrp
-
+  | A.Array(typ, size), SDefaultArray ->
+      default_val_of_typ (A.Array(typ, size)) builder
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -447,8 +472,8 @@ let translate sp_units =
   | _, SUpdate(SArrayAccessUpdate((name, sexpr_index), A.Eq, sexpr)) ->
       let newvalue = build_expr builder v_symbol_tables sexpr in
       let n = build_expr builder v_symbol_tables sexpr_index in (* the integer (as an llvalue) we are indexing to *)
-      let arr = L.build_load (lookup v_symbol_tables name) ("stored_" ^ name) builder in (* load in arr *)
-      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "gep_of_arr" builder in
+      let arr = L.build_load (lookup v_symbol_tables name) "" builder in (* load in arr *)
+      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "" builder in
       let _ = L.build_store newvalue elemp builder in
       newvalue
   | _ -> raise (Failure("unimplemented expr in codegen"))

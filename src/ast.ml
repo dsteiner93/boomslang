@@ -35,7 +35,7 @@ type expr =
 | ObjectVariableAccess of object_variable_access
 | ArrayAccess of array_access
 | ArrayLiteral of expr list
-| ArraySetDefault of typ * string * typ
+| DefaultArray of typ
 | Binop of expr * binop * expr
 | Unop of unaryop * expr
 | Assign of assign
@@ -156,6 +156,7 @@ and string_of_expr existing_suffix new_index =
 | ObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
 | ArrayAccess(array_access) -> string_of_array_access suffix 0 array_access
 | ArrayLiteral(exprs) -> get_multi_node_generator "array_literal" suffix string_of_expr exprs
+| DefaultArray(typ) -> string_of_typ suffix 0 typ
 | Binop(expr1, binop, expr2) -> combine_list "binop" suffix ([string_of_expr suffix 0 expr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_expr suffix 2 expr2])
 | Unop(unaryop, expr) -> combine_list "unaryop" suffix ([string_of_unaryop suffix 0 unaryop] @ [string_of_expr suffix 1 expr])
 | Assign(assign) -> string_of_assign suffix 0 assign
