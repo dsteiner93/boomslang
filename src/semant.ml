@@ -467,14 +467,21 @@ coerce_binop_exprs checked_lhs checked_rhs =
 and
 check_binop_coerced checked_lhs binop checked_rhs =
   let lhs_type = (fst checked_lhs) in
+  let rhs_value = (snd checked_rhs) in
   match binop with
     Plus -> (match lhs_type with
         Primitive(Int) | Primitive(Long) | Primitive(Float) | Primitive(String) ->
           (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
       | Primitive(Char) -> (Primitive(String), SBinop((wrap_to_string [checked_lhs]), binop, (wrap_to_string [checked_rhs])))
       | _ -> raise (Failure("Binop + is not available for type " ^ (str_of_typ lhs_type))))
+    | Divide | Modulo -> (match lhs_type with
+        Primitive(Int) | Primitive(Long) | Primitive(Float) -> 
+          if rhs_value = SIntLiteral(0) then
+            raise (Failure("Cannot divide by 0"))
+          else (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
+  | _ -> raise (Failure("Binops -, *, /, and % are not available for type " ^ (str_of_typ lhs_type))))
 
-    | Subtract | Times | Divide | Modulo -> (match lhs_type with
+    | Subtract | Times | Modulo -> (match lhs_type with
         Primitive(Int) | Primitive(Long) | Primitive(Float) -> (lhs_type, SBinop(checked_lhs, binop, checked_rhs))
       | _ -> raise (Failure("Binops -, *, /, and % are not available for type " ^ (str_of_typ lhs_type))))
 
