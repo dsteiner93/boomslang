@@ -1,0 +1,4 @@
+class MyObject:
+	required:
+		int x
+

@@ -1,0 +1,4 @@
+class MyObject:
+	static:
+		int x = 5
+

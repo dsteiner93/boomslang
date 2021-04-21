@@ -1,0 +1,10 @@
+class MyObject:
+	required:
+		int x
+		string y
+
+def myfunc(int x) returns string:
+	return "hey"
+
+MyObject foo = MyObject(2, myfunc(2+2))
+

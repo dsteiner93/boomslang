@@ -1,0 +1,6 @@
+class MyObject:
+	def _++%%(MyObject other) returns MyObject:
+		return MyObject()
+	def mymethod2(int x) returns int:
+		return 5
+

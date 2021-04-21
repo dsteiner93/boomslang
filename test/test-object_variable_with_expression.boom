@@ -1,0 +1,7 @@
+class MyObject:
+	static:
+		boolean is_this_true = true
+
+MyObject myobject = MyObject()
+boolean x = true and myobject.is_this_true
+

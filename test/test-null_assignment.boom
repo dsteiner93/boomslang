@@ -1,0 +1,5 @@
+class MyObject:
+	def myfunc():
+		println("hey")
+
+MyObject x = NULL

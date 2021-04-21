@@ -1,0 +1,6 @@
+class MyObject:
+	static:
+		int x = 5
+	required:
+		int y
+

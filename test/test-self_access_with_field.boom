@@ -1,0 +1,7 @@
+class Foo:
+	optional:
+		string x = "str"
+
+	def myfunc():
+		self.x
+

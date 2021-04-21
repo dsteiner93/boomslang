@@ -1,0 +1,8 @@
+class MyObject:
+	required:
+		boolean fOOo12345
+
+MyObject myobject = MyObject(false)
+
+myobject.fOOo12345 = true
+

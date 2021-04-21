@@ -1,0 +1,7 @@
+class MyObject:
+	static:
+		int x = 5
+
+MyObject myobject = MyObject()
+myobject.x
+

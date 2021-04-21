@@ -1,0 +1,15 @@
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean boo = true
+

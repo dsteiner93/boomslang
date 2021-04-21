@@ -1,0 +1,10 @@
+class MyObject:
+	def myfunction(int a, string b, boolean c):
+		println("hey")
+
+int a = 5
+string b = "foo"
+boolean c = false
+MyObject myobject = MyObject()
+myobject.myfunction(a, b, c)
+

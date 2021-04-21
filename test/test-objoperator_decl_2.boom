@@ -1,0 +1,12 @@
+class Horse:
+	def _^&%$(Horse other) returns Horse:
+		return Horse()
+
+	def _$%(Horse other) returns Horse:
+		return Horse()
+
+Horse yak = Horse()
+Horse saddle = Horse()
+Horse poop = Horse()
+Horse winne = yak ^&%$ saddle $% poop
+

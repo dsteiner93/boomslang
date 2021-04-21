@@ -1,0 +1,4 @@
+class MyObject:
+	optional:
+		int x = 5
+

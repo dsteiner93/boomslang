@@ -1,0 +1,3 @@
+long fOo = 10L
+fOo -= 500L
+

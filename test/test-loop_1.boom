@@ -1,0 +1,3 @@
+int x = 0
+loop x+=1 while x<100:
+	println("hey")

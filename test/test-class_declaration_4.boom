@@ -1,0 +1,30 @@
+class MyObject:
+	static:
+		int x = 5
+		string foo = "bar"
+
+
+	required:
+		int z
+		float fOOOO
+
+
+
+	optional:
+		boolean boo = true
+
+
+	def mymethod():
+		self.x = 10
+
+
+
+
+
+
+
+	def _++%%(MyObject other) returns MyObject:
+		return MyObject(1, 5.0, false)
+	def mymethod2(int x) returns int:
+		return 5
+

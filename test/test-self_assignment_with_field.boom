@@ -1,0 +1,7 @@
+class MyClass:
+	required:
+		int x
+
+	def myfunc():
+		self.x = 5
+

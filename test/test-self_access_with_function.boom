@@ -1,0 +1,8 @@
+class MyClass:
+
+	def myfunction(int x):
+		println("hey")
+
+	def myfunction2():
+		self.myfunction(2 % 3)
+

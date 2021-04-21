@@ -1,0 +1,8 @@
+class MyObjectTwo:
+	required:
+		string x
+
+
+	optional:
+		string z = "foo"
+
