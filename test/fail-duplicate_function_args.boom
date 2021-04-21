@@ -1,0 +1,3 @@
+def my_func(int x, float x) -> returns int:
+	return 5
+

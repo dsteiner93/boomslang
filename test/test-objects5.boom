@@ -1,0 +1,45 @@
+
+
+class MyClass:
+	required:
+		MyClass myclass
+		int x
+
+	def getself(MyClass myclass) returns MyClass:
+		return self
+
+	def printx(MyClass myclass, MyClass myclass2):
+		println(self.x)
+
+	def to_string() returns string:
+		if self == NULL:
+			return "NULL"
+		else:
+			return "this is my custom to string"
+
+
+
+MyClass innermost = MyClass(NULL, 0)
+MyClass foo = MyClass(MyClass(MyClass(MyClass(MyClass(MyClass(innermost, 1), 2), 3), 4), 5), 6)
+println(foo)
+println(foo.myclass.myclass.getself(NULL).getself(NULL).getself(NULL).myclass.x)
+println(foo.getself(NULL).getself(NULL).x)
+println(foo.getself(NULL).myclass.myclass.getself(NULL).myclass)
+println(foo.myclass.myclass)
+foo.getself(NULL).getself(NULL).printx(NULL, NULL)
+
+println(MyClass(NULL, 0))
+println(MyClass(NULL, 5000).x)
+MyClass(NULL, 5001).printx(NULL, NULL)
+println(MyClass(NULL, 0).to_string())
+
+MyClass myobject = NULL
+println(myobject)
+MyClass myobject2 = MyClass(NULL, 0)
+myobject2 = NULL
+println(myobject2)
+println(NULL == myobject)
+println(myobject == NULL)
+println(NULL == myobject2)
+println(myobject2 == NULL)
+println(myobject == myobject2)

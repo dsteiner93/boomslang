@@ -1,0 +1,22 @@
+int[10] arr = default int[10]
+int i = 0
+loop i += 2 while i < 10:
+	arr[i] = i
+i = 0
+loop i += 1 while i < 10:
+	println(arr[i])
+
+arr = [0,9,8,7,6,5,4,3,2,1]
+println("")
+println(arr[7])
+
+def give_me_an_array() returns string[5]:
+	return ["hi","I","love","PLT","!"]
+
+string[5] foo = give_me_an_array()
+string[5] bar = give_me_an_array()
+
+println("")
+i = 0
+loop i += 1 while i < 5:
+	println(foo[i])

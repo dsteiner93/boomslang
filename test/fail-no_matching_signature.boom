@@ -1,0 +1,5 @@
+def myfunc(string x) returns int:
+	return 5
+
+myfunc(5)
+

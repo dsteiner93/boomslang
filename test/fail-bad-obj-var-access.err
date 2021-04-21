@@ -1,0 +1,1 @@
+Fatal error: exception Failure("Attempted to access variable foo on something that isn't an object.")

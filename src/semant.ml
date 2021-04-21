@@ -30,6 +30,43 @@ let built_in_funcs = [
   ({ fs_name = "compare_strings"; formal_types = [Primitive(String); Primitive(String)] }, Primitive(Bool));
 ]
 
+let type_is_nullable = function
+  Primitive(_) -> false
+| Class(_) -> true
+| Array(_, _) -> false
+| NullType -> true
+
+let are_types_compatible typ1 typ2 =
+  ((typ1 = typ2) || (type_is_nullable(typ1) && typ2 = NullType))
+
+let signature_could_match signature1 signature2 _ =
+  if (signature1.fs_name = signature2.fs_name) && ((List.length signature1.formal_types) = (List.length signature2.formal_types)) then
+    List.for_all2 are_types_compatible (signature2.formal_types) (signature1.formal_types)
+  else false
+
+(* This function is complicated because if the language has nulls, you can't just look up the
+   signature directly. However, since null could match multiple types, if a user calls a func like
+   myfunc(null, null), it is impossible to tell if they meant myfunc(MyObject a, MyObject b) or
+   myfunc(OtherObject a, OtherObject b). *)
+let find_matching_signature signature signatures =
+  let matching_signatures_map = SignatureMap.filter (signature_could_match signature) signatures in
+  let matching_signatures_list = List.map (fst) (SignatureMap.bindings matching_signatures_map) in
+  if List.length matching_signatures_list = 0 then
+    raise (Failure("No matching signature found for function call " ^ signature.fs_name))
+  else if List.length matching_signatures_list > 1 then
+    raise (Failure("The call to " ^ signature.fs_name ^ " is ambiguous."))
+  else List.hd matching_signatures_list
+
+(* If the user is calling a function with NULLs as parameters, we need to
+   convert the type associated with the NullExpr to the type of the formal
+   that is expected. This will help LLVM generate the right kind of null
+   pointer. *)
+let convert_nulls_in_checked_exprs checked_exprs matching_signature =
+  let convert checked_expr typ = match (fst checked_expr) with
+    NullType -> (typ, (snd checked_expr))
+  | _ -> checked_expr in
+  List.map2 convert checked_exprs matching_signature.formal_types
+
 (* Semantic checking of the AST. Returns an SAST if successful,
    throws an exception if something is wrong. *)
 
@@ -77,8 +114,8 @@ let wrap_to_string checked_exprs = match checked_exprs with
 | [(Primitive(Float), _)] -> (Primitive(String), SCall(SFuncCall("float_to_string", checked_exprs)))
 | [(Primitive(Char), _)] -> (Primitive(String), SCall(SFuncCall("char_to_string", checked_exprs)))
 | [(Primitive(Bool), _)] -> (Primitive(String), SCall(SFuncCall("bool_to_string", checked_exprs)))
-| [(NullType, _)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
-| [(Class(_), SId(id))] -> (Primitive(String), SCall(SMethodCall(id, "to_string", [])))
+| [(_, SNullExpr)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
+| [(Class(_), _) as sexpr] -> (Primitive(String), SCall(SMethodCall(sexpr, "to_string", [])))
 | _ -> raise (Failure("Expected exactly 1 expression of a non-void primitive, null, or named object type."))
 in
 let wrap_int_to_long checked_exprs = match checked_exprs with
@@ -95,12 +132,6 @@ let coerceable_types = [
 ] in
 let add_to_map map coerceable_type = LhsRhsMap.add (fst coerceable_type) (snd coerceable_type) map in
 let coerceable_types_map = List.fold_left add_to_map LhsRhsMap.empty coerceable_types
-in
-let type_is_nullable = function
-  Primitive(_) -> false
-| Class(_) -> true
-| Array(_, _) -> false
-| NullType -> true
 in
 
 (* First, figure out all the defined functions *)
@@ -195,28 +226,6 @@ in
 List.fold_left add_class_variables StringMap.empty program
 in
 
-let are_types_compatible typ1 typ2 =
-  ((typ1 = typ2) || (type_is_nullable(typ1) && typ2 = NullType))
-in
-let signature_could_match signature1 signature2 _ =
-  if (signature1.fs_name = signature2.fs_name) && ((List.length signature1.formal_types) = (List.length signature2.formal_types)) then
-    List.for_all2 are_types_compatible (signature2.formal_types) (signature1.formal_types)
-  else false
-in
-(* This function is complicated because if the language has nulls, you can't just look up the
-   signature directly. However, since null could match multiple types, if a user calls a func like
-   myfunc(null, null), it is impossible to tell if they meant myfunc(MyObject a, MyObject b) or
-   myfunc(OtherObject a, OtherObject b). *)
-let find_matching_signature signature signatures =
-  let matching_signatures_map = SignatureMap.filter (signature_could_match signature) signatures in
-  let matching_signatures_list = List.map (fst) (SignatureMap.bindings matching_signatures_map) in
-  if List.length matching_signatures_list = 0 then
-    raise (Failure("No matching signature found for function call " ^ signature.fs_name))
-  else if List.length matching_signatures_list > 1 then
-    raise (Failure("The call to " ^ signature.fs_name ^ " is ambiguous."))
-  else List.hd matching_signatures_list
-in
-
 let rec check_fcall fname actuals v_symbol_tables =
   let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
   let signature = { fs_name = fname; formal_types = List.map (fst) checked_exprs } in
@@ -229,17 +238,19 @@ let rec check_fcall fname actuals v_symbol_tables =
       | [(Primitive(Char), _)] -> [wrap_to_string checked_exprs]
       | [(Primitive(Bool), _)] -> [wrap_to_string checked_exprs]
       | [(NullType, _)] -> [wrap_to_string checked_exprs]
-      | [(Class(_), SId(_))] -> [wrap_to_string checked_exprs]
+      | [(Class(_), _)] -> [wrap_to_string checked_exprs]
       | _ -> checked_exprs in
     let signature = { fs_name = fname; formal_types = List.map (fst) wrapped_checked_exprs } in
     if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, wrapped_checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
   else
     let matching_signature = find_matching_signature signature function_signatures in
-    ((SignatureMap.find matching_signature function_signatures), SCall (SFuncCall(fname, checked_exprs)))
+    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+    ((SignatureMap.find matching_signature function_signatures), SCall (SFuncCall(fname, null_safe_checked_exprs)))
 and
 
-check_mcall object_name fname actuals v_symbol_tables =
-  match (type_of_identifier v_symbol_tables object_name) with
+check_mcall expr fname actuals v_symbol_tables =
+  let checked_expr = check_expr v_symbol_tables expr in
+  match ((fst checked_expr)) with
   Class(class_name) ->
     let class_function_signatures = if StringMap.mem class_name class_signatures
                                     then StringMap.find class_name class_signatures
@@ -248,38 +259,44 @@ check_mcall object_name fname actuals v_symbol_tables =
     let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
     let signature = { fs_name = fname; formal_types = List.map (fst) checked_exprs } in
     let matching_signature = find_matching_signature signature class_function_signatures in
-    ((SignatureMap.find matching_signature class_function_signatures), SCall (SMethodCall(object_name, fname, checked_exprs)))
-  | _ -> raise (Failure(("Attempted to call method on " ^ object_name ^ " but " ^ object_name ^ " was not a class")))
+    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+    ((SignatureMap.find matching_signature class_function_signatures), SCall (SMethodCall(checked_expr, fname, null_safe_checked_exprs)))
+  | _ -> raise (Failure(("Attempted to call method on something that was not a class")))
 and
 
 check_call v_symbol_tables = function
   FuncCall(fname, exprs) -> (check_fcall fname exprs v_symbol_tables)
-| MethodCall(object_name, fname, exprs) -> check_mcall object_name fname exprs v_symbol_tables
+| MethodCall(expr, fname, exprs) -> check_mcall expr fname exprs v_symbol_tables
 and
 
-check_object_variable_access v_symbol_tables = function
-  (id, var_name, is_static_access) as object_variable_access ->
-    if is_static_access then
-      let class_name = id in
-      if StringMap.mem class_name class_static_vars then
-        let class_variable_map = StringMap.find class_name class_static_vars in
-        if StringMap.mem (var_name) class_variable_map then
-          let typ_of_access = StringMap.find (var_name) class_variable_map in
-          (typ_of_access, (SObjectVariableAccess object_variable_access))
-        else raise (Failure("Could not find a static variable named " ^ (var_name) ^ " in class " ^ class_name))
-      else raise (Failure("Could not find a definition for class name " ^ class_name))
-    else
-      let object_type = (type_of_identifier v_symbol_tables id) in
-      match object_type with
-        Class(class_name) -> (* Then check that the variable being accessed on the class actually exists *)
-          if StringMap.mem class_name class_variable_types then
-            let class_variable_map = StringMap.find class_name class_variable_types in
-            if StringMap.mem (var_name) class_variable_map then
-              let typ_of_access = StringMap.find (var_name) class_variable_map in
-              (typ_of_access, (SObjectVariableAccess object_variable_access))
-            else raise (Failure("Could not find a variable named " ^ (var_name) ^ " in class " ^ class_name))
-          else raise (Failure("Could not find a definition for class name " ^ class_name ^ " which corresponded to variable " ^ (id)))
-      | _ -> raise (Failure("Attempted to access variable " ^ (var_name) ^ " on " ^ (id) ^ ", which isn't an object."))
+check_object_variable_access v_symbol_tables obj_var_access =
+  let expr = obj_var_access.ova_expr in
+  let class_name = obj_var_access.ova_class_name in
+  let var_name = obj_var_access.ova_var_name in
+  let is_static_access = obj_var_access.ova_is_static in
+  if is_static_access then
+    if StringMap.mem class_name class_static_vars then
+      let class_variable_map = StringMap.find class_name class_static_vars in
+      if StringMap.mem (var_name) class_variable_map then
+        let typ_of_access = StringMap.find (var_name) class_variable_map in
+        let sova = { sova_sexpr = (NullType, SNullExpr); sova_class_name = class_name; sova_var_name = var_name; sova_is_static = is_static_access } in
+        (typ_of_access, (SObjectVariableAccess sova))
+      else raise (Failure("Could not find a static variable named " ^ (var_name) ^ " in class " ^ class_name))
+    else raise (Failure("Could not find a definition for class name " ^ class_name))
+  else
+    let checked_expr = check_expr v_symbol_tables expr in
+    let object_type = (fst checked_expr) in
+    match object_type with
+      Class(class_name) -> (* Then check that the variable being accessed on the class actually exists *)
+        if StringMap.mem class_name class_variable_types then
+          let class_variable_map = StringMap.find class_name class_variable_types in
+          if StringMap.mem (var_name) class_variable_map then
+            let typ_of_access = StringMap.find (var_name) class_variable_map in
+            let sova = { sova_sexpr = checked_expr; sova_class_name = class_name; sova_var_name = var_name; sova_is_static = is_static_access } in
+            (typ_of_access, (SObjectVariableAccess sova))
+          else raise (Failure("Could not find a variable named " ^ (var_name) ^ " in class " ^ class_name))
+        else raise (Failure("Could not find a definition for class name " ^ class_name))
+    | _ -> raise (Failure("Attempted to access variable " ^ (var_name) ^ " on something that isn't an object."))
 and
 
 check_lhs_is_not_void = function
@@ -323,11 +340,13 @@ check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
+  let _ = (match lhs_type with Class(class_name) -> (check_class_exists class_name) | _ -> ()) in
   match lhs_type with
     Array(lhs_element_type, lhs_size) -> check_array_assign lhs_name lhs_element_type lhs_size this_scopes_v_table checked_expr
   | _ ->
     if (rhs_type = lhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-      ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
+      let converted_null = (lhs_type, (snd checked_expr)) in
+      ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_null)))
     else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
       let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
       ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, (converter [checked_expr]))))
@@ -347,14 +366,20 @@ check_regular_update id updateop rhs_expr v_symbol_tables =
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SRegularUpdate(id, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SRegularUpdate(id, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SRegularUpdate(id, updateop, (converter [checked_expr]))))
           else raise (Failure(("Illegal update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
 and
+get_sova = function
+  SObjectVariableAccess(sova) -> sova
+| _ -> raise (Failure("Found something other than an object variable access in an unexpected place."))
+and
 check_object_variable_update object_variable_access updateop rhs_expr v_symbol_tables =
   let checked_object_variable_access = check_object_variable_access v_symbol_tables object_variable_access in
+  let sova = (get_sova (snd checked_object_variable_access)) in
   let lhs_type = (fst checked_object_variable_access) in
   let checked_expr = (check_expr v_symbol_tables rhs_expr) in
   let rhs_type = (fst checked_expr) in
@@ -362,10 +387,11 @@ check_object_variable_update object_variable_access updateop rhs_expr v_symbol_t
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SObjectVariableUpdate(object_variable_access, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SObjectVariableUpdate(sova, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
-            ((fst checked_expr), SUpdate (SObjectVariableUpdate(object_variable_access, updateop, (converter [checked_expr]))))
+            ((fst checked_expr), SUpdate (SObjectVariableUpdate(sova, updateop, (converter [checked_expr]))))
           else raise (Failure(("Illegal object variable update. LHS was type " ^ (str_of_typ lhs_type) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
 and
 check_array_access_update array_access updateop rhs_expr v_symbol_tables =
@@ -378,7 +404,8 @@ check_array_access_update array_access updateop rhs_expr v_symbol_tables =
   match updateop with
     Eq ->
           if (lhs_type = rhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
-            (lhs_type, SUpdate (SArrayAccessUpdate(sarray_access, updateop, checked_expr)))
+            let converted_null = (lhs_type, (snd checked_expr)) in
+            (lhs_type, SUpdate (SArrayAccessUpdate(sarray_access, updateop, converted_null)))
           else if LhsRhsMap.mem lhs_rhs coerceable_types_map then
             let converter = LhsRhsMap.find lhs_rhs coerceable_types_map in
             ((fst checked_expr), SUpdate (SArrayAccessUpdate(sarray_access, updateop, (converter [checked_expr]))))
@@ -425,7 +452,11 @@ check_array_literal exprs v_symbol_tables =
   let _ = check_exprs_have_same_type checked_exprs in
   let non_null_list = List.filter (function p -> p <> NullType) (List.map fst checked_exprs) in
   let element_typ = if List.length non_null_list > 0 then (List.hd non_null_list) else NullType in
-  let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral checked_exprs))
+  let convert_null typ checked_expr = match (fst checked_expr) with
+    NullType -> (typ, (snd checked_expr))
+  | _ -> checked_expr in
+  let null_safe_checked_exprs = List.map (convert_null element_typ) checked_exprs in
+  let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral null_safe_checked_exprs))
 and
 
 check_default_array typ = match typ with
@@ -506,8 +537,9 @@ check_object_instantiation class_name exprs v_symbol_tables =
     (* See if there is a constructor matching this signature *)
     let signatures_in_class = StringMap.find class_name class_signatures in
     let signature = { fs_name = "construct"; formal_types = List.map fst checked_exprs } in
-    try (let _ = find_matching_signature signature signatures_in_class in
-      (Class(class_name), SObjectInstantiation(class_name, checked_exprs)))
+    try (let matching_signature = find_matching_signature signature signatures_in_class in
+      let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+      (Class(class_name), SObjectInstantiation(class_name, null_safe_checked_exprs)))
     with Failure(_) -> (raise (Failure("Attempted to initialize class " ^ class_name ^ " using a type signature that has no associated constructor.")))
   else raise (Failure("Attempted to initialize class " ^ class_name ^ " that does not exist."))
 and
@@ -670,10 +702,13 @@ and
 get_sstmt_from_bind bind =
   let typ = (fst bind) in
   let name = (snd bind) in
-  SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name, false), Eq, (typ, SId(name)))))
+  let sova = { sova_sexpr = (NullType, SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
+  SExpr (typ, SUpdate(SObjectVariableUpdate(sova, Eq, (typ, SId(name)))))
 and
 get_sstmt_from_assign_with_default v_symbol_tables = function
-  RegularAssign(typ, name, expr) -> SExpr (typ, SUpdate(SObjectVariableUpdate(("self", name, false), Eq, (check_expr v_symbol_tables expr))))
+  RegularAssign(typ, name, expr) ->
+    let sova = { sova_sexpr = (NullType, SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
+    SExpr (typ, SUpdate(SObjectVariableUpdate(sova, Eq, (check_expr v_symbol_tables expr))))
 and
 get_required_only_constructor v_symbol_tables classdecl =
   let body = (List.map get_sstmt_from_bind classdecl.required_vars) @ (List.map (get_sstmt_from_assign_with_default v_symbol_tables) classdecl.optional_vars) in

@@ -1,0 +1,20 @@
+int x = 5
+def myfunc(int x, MyObject foo) returns string:
+	int y = 5
+	int z = 7
+	if x > 5:
+		if x > 10:
+			int z = 20
+		elif x > 20:
+			println("hey")
+		elif x > 30:
+			println("hey")
+			println("hey")
+		else:
+		println("hey")
+
+
+
+
+int x = 50
+

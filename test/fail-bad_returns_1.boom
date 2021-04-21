@@ -1,0 +1,6 @@
+def my_func() returns int:
+	if x > 5:
+		println("hey")
+	else:
+		return 5
+

@@ -1,0 +1,35 @@
+
+
+class MyClass:
+	required:
+		MyClass myclass
+		int x
+
+	def construct():
+		# do nothing
+		2 + 2
+
+	def getself() returns MyClass:
+		return self
+
+	def printx():
+		println(self.x)
+
+	def to_string() returns string:
+		return "this is my custom to string"
+
+
+
+MyClass innermost = MyClass()
+MyClass foo = MyClass(MyClass(MyClass(MyClass(MyClass(MyClass(innermost, 1), 2), 3), 4), 5), 6)
+println(foo)
+println(foo.myclass.myclass.getself().getself().getself().myclass.x)
+println(foo.getself().getself().x)
+println(foo.getself().myclass.myclass.getself().myclass)
+println(foo.myclass.myclass)
+foo.getself().getself().printx()
+
+println(MyClass())
+println(MyClass().x)
+MyClass().printx()
+println(MyClass().to_string())

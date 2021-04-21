@@ -1,0 +1,4 @@
+class MyClass:
+	static:
+		void x = NULL
+
