@@ -9,7 +9,7 @@ type updateop = Eq
 type typ = 
   Primitive of primitive
 | Class of string
-| Array of typ * int
+| Array of typ
 | NullType
 
 type bind = typ * string
@@ -29,12 +29,18 @@ type expr =
 | ObjectVariableAccess of object_variable_access
 | ArrayAccess of array_access
 | ArrayLiteral of expr list
-| DefaultArray of typ
+(* e.g. int[2+2][5][6] would be parsed as
+   (Array(int), [2+2]) then
+   (Array(Array(int)), [5, 2+2]) then
+   (Array(Array(Array(int))), [6, 5, 2+2])
+   Telling us this is a default triple array that is an array of length 6
+   containing arrays of length 5 containing arrays of length 4. *)
+| DefaultArray of typ * expr list
 | Binop of expr * binop * expr
 | Unop of unaryop * expr
 | Assign of assign
 | Update of update
-and array_access = string * expr
+and array_access = expr * expr (* First expr must be an array, second must be int *)
 and call =
   FuncCall of string * expr list (* my_func(1, 2, 3) *)
 | MethodCall of expr * string * expr list (* expr.identifier(params) *)
@@ -122,7 +128,7 @@ let rec string_of_typ existing_suffix new_index =
   function
   Primitive(primitive) -> string_of_primitive suffix 0 primitive
 | Class(class_string) -> ("class" ^ suffix, [get_class_node_label "class" suffix class_string])
-| Array(typ, integer) -> combine_list "array_type" suffix ([string_of_typ suffix 0 typ] @ [string_of_expr suffix 1 (IntLiteral integer)])
+| Array(typ) -> combine_list "array_type" suffix ([string_of_typ suffix 0 typ])
 | NullType -> ("NULL" ^ suffix, [get_class_node_label "NULL" suffix "NULL"])
 and string_of_primitive existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
@@ -151,16 +157,16 @@ and string_of_expr existing_suffix new_index =
 | ObjectVariableAccess(object_variable_access) -> string_of_object_variable_access suffix 0 object_variable_access
 | ArrayAccess(array_access) -> string_of_array_access suffix 0 array_access
 | ArrayLiteral(exprs) -> get_multi_node_generator "array_literal" suffix string_of_expr exprs
-| DefaultArray(typ) -> string_of_typ suffix 0 typ
+| DefaultArray(typ, exprs) -> combine_list "default_array" suffix ([string_of_typ suffix 0 typ] @ (mapiplus 1 (string_of_expr suffix) exprs))
 | Binop(expr1, binop, expr2) -> combine_list "binop" suffix ([string_of_expr suffix 0 expr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_expr suffix 2 expr2])
 | Unop(unaryop, expr) -> combine_list "unaryop" suffix ([string_of_unaryop suffix 0 unaryop] @ [string_of_expr suffix 1 expr])
 | Assign(assign) -> string_of_assign suffix 0 assign
 | Update(update) -> string_of_update suffix 0 update
 and string_of_array_access existing_suffix new_index array_access =
   let suffix = new_suffix existing_suffix new_index in
-  let id_string = (fst array_access) in
-  let expr = (snd array_access) in
-  combine_list "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_expr suffix 1 expr])
+  let expr1 = (fst array_access) in
+  let expr2 = (snd array_access) in
+  combine_list "array_access" suffix ([string_of_expr suffix 0 expr1] @ [string_of_expr suffix 1 expr2])
 and string_of_call existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function

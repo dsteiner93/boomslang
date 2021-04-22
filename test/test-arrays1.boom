@@ -1,4 +1,4 @@
-int[10] arr = default int[10]
+int[] arr = default int[10]
 int i = 0
 loop i += 2 while i < 10:
 	arr[i] = i
@@ -10,11 +10,11 @@ arr = [0,9,8,7,6,5,4,3,2,1]
 println("")
 println(arr[7])
 
-def give_me_an_array() returns string[5]:
+def give_me_an_array() returns string[]:
 	return ["hi","I","love","PLT","!"]
 
-string[5] foo = give_me_an_array()
-string[5] bar = give_me_an_array()
+string[] foo = give_me_an_array()
+string[] bar = give_me_an_array()
 
 println("")
 i = 0

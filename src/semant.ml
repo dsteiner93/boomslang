@@ -33,7 +33,7 @@ let built_in_funcs = [
 let type_is_nullable = function
   Primitive(_) -> false
 | Class(_) -> true
-| Array(_, _) -> false
+| Array(_) -> false
 | NullType -> true
 
 let are_types_compatible typ1 typ2 =
@@ -190,6 +190,11 @@ let check_class_exists class_name =
   if StringMap.mem class_name class_signatures then ()
   else raise (Failure("Class name " ^ class_name ^ " was never defined."))
 in
+let rec check_class_exists_nested = function (* if defining an object array, make sure class is defined *)
+    Class(name) -> check_class_exists name
+  | Array(typ)  -> check_class_exists_nested typ
+  | _           -> ()
+in
 (* Next, figure out the types for all variables for classes.
    This will build a Map<ClassName, Map<VariableName, TypeOfVariable>> *)
 let class_variable_types =
@@ -305,29 +310,34 @@ check_lhs_is_not_void = function
 | _ -> ()
 and
 (* Arrays are painful due to empty array literals and array literals containing NULL *)
-check_array_assign lhs_name lhs_element_type lhs_size this_scopes_v_table checked_expr =
-  (* *_type is always like Array(Int, 5). *_element_type is the type of the element
+check_array_assign lhs_name lhs_element_type this_scopes_v_table checked_expr =
+  (* *_type is always like Array(Int). *_element_type is the type of the element
      making up the array, e.g. Int *)
-  let _ = match lhs_element_type with (* if defining an object array, make sure class is defined *)
-    Class(name) -> check_class_exists name 
-  | _           -> () in
-  let lhs_type = Array(lhs_element_type, lhs_size) in
+  (* if defining an object array, make sure class is defined *)
+  let _ = check_class_exists_nested lhs_element_type in
+  let lhs_type = Array(lhs_element_type) in
   let rhs_type = (fst checked_expr) in
+  (* Size checks can only be applied to array literals and are used for the empty list case,
+     because this is the only case where the type is unknown, other than a list containing
+     only NULLs, which is only allowed for objects. *)
+  let rhs_size = (match (snd checked_expr) with
+    SArrayLiteral(sexprs) -> List.length sexprs
+  | _ -> -1) in (* TODO this doesn't work with nested arrays *)
   match rhs_type with
-    Array(rhs_element_type, rhs_size) ->
-      if lhs_size = 0 && rhs_size = 0 then
-        (* If the array is size 0, the type of the RHS doesn't matter if it is also size 0 *)
+    Array(rhs_element_type) ->
+      if rhs_size = 0 then
+        (* If the RHS is 0, then the types don't matter, since it can match any type *)
         ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
-      else if (type_is_nullable lhs_element_type) && lhs_size == rhs_size && ((lhs_element_type = rhs_element_type) || (rhs_element_type = NullType)) then
+      else if (type_is_nullable lhs_element_type) && ((lhs_element_type = rhs_element_type) || (rhs_element_type = NullType)) then
         (* If the LHS is a nullable type, the array literal could be like [NULL, NULL, NULL] in which
-           case its element type will be NullType, but it should still match an array like MyArray[3] *)
+           case its element type will be NullType, but it should still match an array like MyArray[] *)
         ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
       else if (rhs_type = lhs_type) then
         (* If we reached this point, the element type is not allowed to be null and it is non-zero. So the
            types need to directly match. *)
         ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
       else
-        raise (Failure(("Illegal assignment. LHS was type " ^ (str_of_typ (Array(lhs_element_type, lhs_size))) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
+        raise (Failure(("Illegal assignment. LHS was type " ^ (str_of_typ (Array(lhs_element_type))) ^ " but RHS type was " ^ (str_of_typ (fst checked_expr)))))
   | _ -> raise (Failure("RHS of array assignment must be an array."))
 and
 check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
@@ -342,7 +352,7 @@ check_regular_assign lhs_type lhs_name rhs_expr v_symbol_tables =
   let lhs_rhs = { lhs = lhs_type; rhs = rhs_type } in
   let _ = (match lhs_type with Class(class_name) -> (check_class_exists class_name) | _ -> ()) in
   match lhs_type with
-    Array(lhs_element_type, lhs_size) -> check_array_assign lhs_name lhs_element_type lhs_size this_scopes_v_table checked_expr
+    Array(lhs_element_type) -> check_array_assign lhs_name lhs_element_type this_scopes_v_table checked_expr
   | _ ->
     if (rhs_type = lhs_type) || ((type_is_nullable lhs_type) && (rhs_type = NullType)) then
       let converted_null = (lhs_type, (snd checked_expr)) in
@@ -417,16 +427,16 @@ check_update v_symbol_tables = function
 | ArrayAccessUpdate(array_access, updateop, expr) -> check_array_access_update array_access updateop expr v_symbol_tables
 and
 
-check_array_access array_name expr v_symbol_tables =
+check_array_access array_expr int_expr v_symbol_tables =
   (* Check the expr used to index into an array is an int.
-     Check that the array name is actually referring to an array.
+     Check that the expr being indexed into is actually an array.
      Checking that the index is not out of bounds has to be done in codegen. *)
-  let checked_expr = (check_expr v_symbol_tables expr) in
-  let _ = (check_type_is_int (fst checked_expr)) in
-  let name_type = (type_of_identifier v_symbol_tables array_name) in
-  match name_type with
-      Array(typ, _) -> (typ, SArrayAccess(array_name, checked_expr))
-    | _ -> raise (Failure("Attempted to access " ^ array_name ^ " like it was an array, but it was not an array."))
+  let rhs_checked_expr = (check_expr v_symbol_tables int_expr) in
+  let _ = (check_type_is_int (fst rhs_checked_expr)) in
+  let lhs_checked_expr = (check_expr v_symbol_tables array_expr) in
+  match (fst lhs_checked_expr) with
+      Array(typ) -> (typ, SArrayAccess(lhs_checked_expr, rhs_checked_expr))
+    | _ -> raise (Failure("Attempted to access something like it was an array, but it was not an array."))
 and
 
 check_exprs_have_same_type l = match l with
@@ -446,7 +456,7 @@ check_exprs_have_same_type l = match l with
     else check_exprs_have_same_type (List.tl l)
 and
 check_array_literal exprs v_symbol_tables =
-  if (List.length exprs) = 0 then (Array(NullType, 0), (SArrayLiteral []))
+  if (List.length exprs) = 0 then (Array(NullType), (SArrayLiteral []))
   else
   let checked_exprs = List.map (check_expr v_symbol_tables) exprs in
   let _ = check_exprs_have_same_type checked_exprs in
@@ -456,11 +466,14 @@ check_array_literal exprs v_symbol_tables =
     NullType -> (typ, (snd checked_expr))
   | _ -> checked_expr in
   let null_safe_checked_exprs = List.map (convert_null element_typ) checked_exprs in
-  let typ = Array(element_typ, (List.length checked_exprs)) in (typ, (SArrayLiteral null_safe_checked_exprs))
+  let typ = Array(element_typ) in (typ, (SArrayLiteral null_safe_checked_exprs))
 and
 
-check_default_array typ = match typ with
-  Array(_) -> typ, SDefaultArray
+check_default_array typ exprs v_symbol_tables = match typ with
+  Array(_) -> let _ = check_class_exists_nested typ in
+              let checked_exprs = List.map (check_expr v_symbol_tables) exprs in
+              let _ = List.iter (check_type_is_int) (List.map fst checked_exprs) in
+              (typ, SDefaultArray(typ, checked_exprs))
 | _        -> raise (Failure ("Attempted to create a default non-array type"))
 and
 
@@ -559,7 +572,7 @@ check_expr v_symbol_tables = function
 | ObjectVariableAccess(object_variable_access) -> check_object_variable_access v_symbol_tables object_variable_access
 | ArrayAccess(array_name, expr) -> check_array_access array_name expr v_symbol_tables
 | ArrayLiteral(exprs) -> check_array_literal exprs v_symbol_tables
-| DefaultArray(typ) -> check_default_array typ
+| DefaultArray(typ, exprs) -> check_default_array typ exprs v_symbol_tables
 | Binop(lhs_expr, binop, rhs_expr) -> check_binop lhs_expr binop rhs_expr v_symbol_tables
 | Unop(unaryop, expr) -> check_unop unaryop expr v_symbol_tables
 | Assign(assign) ->

@@ -1,2 +1,2 @@
-string[3] arr = ["one", "two", "three"]
+string[] arr = ["one", "two", "three"]
 arr[1] = 50.0

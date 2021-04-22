@@ -1,1 +1,1 @@
-int[3] arr = default int[2]
+int[] arr = default string[2]

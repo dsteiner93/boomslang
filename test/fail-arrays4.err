@@ -1,1 +1,1 @@
-Fatal error: exception Failure("Attempted to create a default non-array type")
+Fatal error: exception Parsing.Parse_error

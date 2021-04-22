@@ -1,4 +1,4 @@
-int[3] arr = [3+2, exp(5,2), 42]
+int[] arr = [3+2, exp(5,2), 42]
 
 print_arr3(arr)
 
@@ -13,7 +13,7 @@ def exp(int b, int p) returns int:
 	return start
 
 # this function prints out an array of size 3
-def print_arr3(int[3] a) returns void:
+def print_arr3(int[] a) returns void:
 	int i = 0
 	loop i += 1 while i < 3:
 		println(arr[i])

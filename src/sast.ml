@@ -18,12 +18,12 @@ and sx =
 | SObjectVariableAccess of sobject_variable_access
 | SArrayAccess of sarray_access
 | SArrayLiteral of sexpr list
-| SDefaultArray
+| SDefaultArray of typ * sexpr list
 | SBinop of sexpr * binop * sexpr
 | SUnop of unaryop * sexpr
 | SAssign of sassign
 | SUpdate of supdate
-and sarray_access = string * sexpr
+and sarray_access = sexpr * sexpr
 and scall =
   SFuncCall of string * sexpr list
 | SMethodCall of sexpr * string * sexpr list
@@ -90,7 +90,7 @@ let rec str_of_typ = function
 | Primitive(Bool) -> "boolean"
 | Primitive(Void) -> "void"
 | Class(str) -> "Class(" ^ str ^ ")"
-| Array(typ, size) -> (str_of_typ typ) ^ "[" ^ (string_of_int size) ^ "]"
+| Array(typ) -> (str_of_typ typ) ^ "[]"
 | NullType -> "NULL"
 
 let get_label_with_type suffixed_name unsuffixed_name typ = suffixed_name ^ " [label=\"" ^ unsuffixed_name ^ " (" ^ (str_of_typ typ) ^ ")\"]"
@@ -127,16 +127,16 @@ let rec string_of_sexpr existing_suffix new_index sexpr =
 | SObjectVariableAccess(sobject_variable_access) -> string_of_sobject_variable_access suffix 0 sobject_variable_access
 | SArrayAccess(sarray_access) -> string_of_sarray_access suffix 0 sarray_access typ
 | SArrayLiteral(sexprs) -> get_multi_node_generator_typ "array_literal" suffix string_of_sexpr sexprs typ
-| SDefaultArray -> get_multi_node_generator_typ "default_array" suffix string_of_sexpr [] typ
+| SDefaultArray(typ, sexprs) -> combine_list_typ "default_array" suffix ([string_of_typ suffix 0 typ] @ (mapiplus 1 (string_of_sexpr suffix) sexprs)) typ
 | SBinop(sexpr1, binop, sexpr2) -> combine_list_typ "binop" suffix ([string_of_sexpr suffix 0 sexpr1] @ [string_of_binoperator suffix 1 binop] @ [string_of_sexpr suffix 2 sexpr2]) typ
 | SUnop(unaryop, sexpr) -> combine_list_typ "unaryop" suffix ([string_of_unaryop suffix 0 unaryop] @ [string_of_sexpr suffix 1 sexpr]) typ
 | SAssign(sassign) -> string_of_sassign suffix 0 sassign
 | SUpdate(supdate) -> string_of_supdate typ suffix 0 supdate
 and string_of_sarray_access existing_suffix new_index sarray_access typ =
   let suffix = new_suffix existing_suffix new_index in
-  let id_string = (fst sarray_access) in
-  let sexpr = (snd sarray_access) in
-  combine_list_typ "array_access" suffix ([string_of_id suffix 0 id_string] @ [string_of_sexpr suffix 1 sexpr]) typ
+  let sexpr1 = (fst sarray_access) in
+  let sexpr2 = (snd sarray_access) in
+  combine_list_typ "array_access" suffix ([string_of_sexpr suffix 0 sexpr1] @ [string_of_sexpr suffix 1 sexpr2]) typ
 and string_of_scall typ existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in
   function
