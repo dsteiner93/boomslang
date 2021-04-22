@@ -4,3 +4,5 @@ class Horse:
 Horse yak = Horse()
 Horse saddle = Horse()
 Horse winne = yak+*saddle
+
+

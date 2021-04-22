@@ -56,6 +56,3 @@ zip :
 
 test :
 	../test/testall.sh
-
-pythontest :
-	python3 -m unittest run_tests

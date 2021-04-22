@@ -2,3 +2,6 @@ int x = 2
 int foo = 2+2 # comment
 int y = 2
 
+println(x)
+println(foo)
+println(y)

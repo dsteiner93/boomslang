@@ -36,6 +36,8 @@ def myfunc2(int x, float foo) returns string:
 	return "hey"
 
 
-
+string str1 = myfunc(x, 5234.2425)
+println(str1)
 int x = 50
-
+string str2 = myfunc2(x, 5345.3)
+println(str2)

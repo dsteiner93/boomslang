@@ -3,5 +3,5 @@ class MyObject:
 		int x = 5
 
 MyObject myobject = MyObject()
-myobject.x
-
+int a = myobject.x
+println(a)

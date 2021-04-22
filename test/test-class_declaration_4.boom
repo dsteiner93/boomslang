@@ -28,3 +28,6 @@ class MyObject:
 	def mymethod2(int x) returns int:
 		return 5
 
+MyObject mo = MyObject(1,1.0)
+int x = mo.mymethod2(7)
+println(x)

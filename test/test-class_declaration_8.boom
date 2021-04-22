@@ -1,4 +1,5 @@
 class MyObject:
 	optional:
 		int x = 5
-
+MyObject mo = MyObject()
+println(mo.x)

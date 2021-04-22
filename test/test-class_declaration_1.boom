@@ -13,3 +13,6 @@ class MyObject:
 	optional:
 		boolean boo = true
 
+MyObject mo = MyObject(10, 1.0)
+println(mo.z)
+println(mo.fOOOO)

@@ -20,5 +20,9 @@ class MyObject:
 	def _++%%(MyObject other) returns MyObject:
 		return MyObject(1, 5.0)
 
+MyObject apple = MyObject(10, 1.0, false)
+MyObject banana = MyObject(5, 7.0, true)
 
+MyObject appana = apple ++%% banana
 
+println(appana.fOOOO)

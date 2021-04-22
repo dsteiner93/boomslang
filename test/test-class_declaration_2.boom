@@ -13,4 +13,7 @@ class MyObject:
 	optional:
 		boolean boo = true
 
-
+MyObject foo = MyObject(10,1.0)
+println(foo.boo)
+println(foo.foo)
+println(foo.x)

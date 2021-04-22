@@ -4,5 +4,6 @@ class MyObject:
 
 MyObject myobject = MyObject(false)
 
+println(myobject.fOOo12345)
 myobject.fOOo12345 = true
-
+println(myobject.fOOo12345)

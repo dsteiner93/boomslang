@@ -18,3 +18,5 @@ def myfunc(int x, float foo) returns string:
 
 int x = 50
 
+string str = myfunc(32, 234.8)
+println(str)

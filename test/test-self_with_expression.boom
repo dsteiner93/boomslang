@@ -2,6 +2,10 @@ class MyClass:
 	required:
 		int foo
 
-	def myfunc():
+	def myfunc() returns int:
 		int x = self.foo * 5
+		return x
+
+MyClass mc = MyClass(5)
+println(mc.myfunc())
 
