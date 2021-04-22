@@ -1,0 +1,8 @@
+class MyClass:
+	def print_5():
+		println("5")
+
+MyClass my_object = MyClass()
+MyClass x = my_object
+x.print_5()
+

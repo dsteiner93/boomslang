@@ -1,0 +1,4 @@
+string[3] arr = ["one", "two", "three"]
+arr[1] = "newvalue"
+arr[1]
+

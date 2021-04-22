@@ -1,8 +1,8 @@
 class Horse:
-	def _+#(Horse other) returns int:
+	def _+%(Horse other) returns int:
 		return 5
 
 Horse yak = Horse()
 Horse saddle = Horse()
-int winne = 8 + yak+#saddle + 6
+int winne = 8 + yak+%saddle + 6
 

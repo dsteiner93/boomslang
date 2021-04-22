@@ -1,0 +1,6 @@
+class MyClass:
+	required:
+		int x
+	def construct(int x):
+		println("i am overwriting the default constructor")
+
