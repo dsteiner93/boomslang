@@ -1,0 +1,4 @@
+class MyGeneric[K]:
+	required:
+		K k
+class MyActual = MyGeneric(int, string)

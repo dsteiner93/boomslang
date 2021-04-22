@@ -1,0 +1,4 @@
+class MyGeneric[G]:
+	required:
+		G g
+class MyActual = MyGeeneric(int)

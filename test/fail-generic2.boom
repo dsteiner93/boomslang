@@ -1,0 +1,6 @@
+class MyGeneric:
+	required:
+		int x
+class MyGeneric[G]:
+	required:
+		G g

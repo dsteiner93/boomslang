@@ -73,7 +73,21 @@ type fdecl = {
 }
 
 type classdecl = {
+  (* The name of the class being defined. *)
   cname: string;
+  (* This is only used for the case of instantiating a generic class.
+     e.g. in class StringToIntMap = HashMap(string, int), this will
+     be set to HashMap, as this is a real valued instantiation of
+     the generic HashMap. *)
+  source_class_name: string;
+  (* If this is the generic class definition, these are the names
+     of the generic types. e.g. in class HashMap[K, V]: the generics
+     are [K, V]. If this is the real class instantiation of the
+     generic class, these are the types that fill in the generics.
+     e.g. class StringToIntMap = HashMap(string, int), generics
+     becomes [string, int]. If this is a regular class def, e.g.
+     class MyClass:, then this list is empty. *)
+  generics: typ list;
   static_vars: assign list;
   required_vars: bind list;
   optional_vars: assign list;
@@ -237,7 +251,7 @@ let string_of_fdecl existing_suffix new_index fdecl =
 
 let string_of_classdecl existing_suffix new_index classdecl =
   let suffix = new_suffix existing_suffix new_index in
-  combine_list "classdecl" suffix ([string_of_id suffix 0 classdecl.cname] @ (mapiplus 1 (string_of_assign suffix) classdecl.static_vars) @ (mapiplus (1+List.length classdecl.static_vars) (string_of_bind suffix) classdecl.required_vars) @ (mapiplus (1+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)) (string_of_assign suffix) classdecl.optional_vars) @ (mapiplus (1+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)+(List.length classdecl.optional_vars)) (string_of_fdecl suffix) classdecl.methods))
+  combine_list "classdecl" suffix ([string_of_id suffix 0 classdecl.cname] @ (mapiplus 1 (string_of_assign suffix) classdecl.static_vars) @ (mapiplus (1+List.length classdecl.static_vars) (string_of_bind suffix) classdecl.required_vars) @ (mapiplus (1+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)) (string_of_assign suffix) classdecl.optional_vars) @ (mapiplus (1+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)+(List.length classdecl.optional_vars)) (string_of_fdecl suffix) classdecl.methods) @ [string_of_id suffix (1+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)+(List.length classdecl.optional_vars)+(List.length classdecl.methods)) classdecl.source_class_name] @ (mapiplus (2+(List.length classdecl.static_vars)+(List.length classdecl.required_vars)+(List.length classdecl.optional_vars)+(List.length classdecl.methods)) (string_of_typ suffix) classdecl.generics))
 
 let string_of_p_unit existing_suffix new_index =
   let suffix = new_suffix existing_suffix new_index in

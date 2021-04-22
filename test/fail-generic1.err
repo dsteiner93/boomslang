@@ -1,0 +1,1 @@
+Fatal error: exception Failure("Attempted to initialize MyGeneric as MyActual but 1 types were expected and 2 were provided.")

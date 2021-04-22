@@ -1,0 +1,5 @@
+class MyGeneric[G, G]: # can't duplicate the type name
+	required:
+		G g
+
+class MyActual = MyGeneric(int, int)

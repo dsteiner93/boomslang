@@ -1,0 +1,53 @@
+
+class KeyValue[K, V]:
+	required:
+		K key
+		V value
+
+	def get_key() returns K:
+		return self.key
+
+	def get_value() returns V:
+		return self.value
+
+	def get_key(V value) returns K:
+		return self.key
+
+	def get_value(K key) returns V:
+		return self.value
+
+class StringIntKeyValue = KeyValue(string, int)
+
+StringIntKeyValue kv1 = StringIntKeyValue("hey1", 1)
+StringIntKeyValue kv2 = StringIntKeyValue("hey2", 2)
+IntStringKeyValue kv3 = IntStringKeyValue(3, "reversed1")
+IntStringKeyValue kv4 = IntStringKeyValue(4, "reversed2")
+println(kv1.key)
+println(kv1.value)
+println(kv1.get_key())
+println(kv1.get_value())
+println(kv1.get_key(kv1.value))
+println(kv1.get_value(kv1.key))
+
+println(kv2.key)
+println(kv2.value)
+println(kv2.get_key())
+println(kv2.get_value())
+println(kv2.get_key(kv2.value))
+println(kv2.get_value(kv2.key))
+
+println(kv3.key)
+println(kv3.value)
+println(kv3.get_key())
+println(kv3.get_value())
+println(kv3.get_key(kv3.value))
+println(kv3.get_value(kv3.key))
+
+println(kv4.key)
+println(kv4.value)
+println(kv4.get_key())
+println(kv4.get_value())
+println(kv4.get_key(kv4.value))
+println(kv4.get_value(kv4.key))
+
+class IntStringKeyValue = KeyValue(int, string)

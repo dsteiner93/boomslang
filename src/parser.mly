@@ -108,35 +108,40 @@ params: /* these are the params used to invoke a function */
   expr { [$1] }
 | params COMMA expr { $3 :: $1 }
 
+classheader:
+  CLASS CLASS_NAME COLON NEWLINE { ($2, []) }
+| CLASS CLASS_NAME LBRACKET class_name_list RBRACKET COLON NEWLINE { ($2, (List.rev $4)) }
+
 classdecl:
-  CLASS CLASS_NAME COLON NEWLINE
+  classheader
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = List.rev $24; methods = List.rev $27} }
-| CLASS CLASS_NAME COLON NEWLINE
-    INDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = []; methods = List.rev $6} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = List.rev $7; required_vars = List.rev $14; optional_vars = List.rev $21; methods = List.rev $24} }
+| classheader
+    INDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = []; required_vars = []; optional_vars = []; methods = List.rev $3} }
+| classheader
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = []; methods = List.rev $13} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = List.rev $7; required_vars = []; optional_vars = []; methods = List.rev $10} }
+| classheader
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = []; methods = List.rev $13} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = []; required_vars = List.rev $7; optional_vars = []; methods = List.rev $10} }
+| classheader
     INDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = []; optional_vars = List.rev $10; methods = List.rev $13} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = []; required_vars = []; optional_vars = List.rev $7; methods = List.rev $10} }
+| classheader
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = List.rev $17; optional_vars = []; methods = List.rev $20} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = List.rev $7; required_vars = List.rev $14; optional_vars = []; methods = List.rev $17} }
+| classheader
     INDENT STATIC COLON NEWLINE INDENT assigns NEWLINE
     DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = List.rev $10; required_vars = []; optional_vars = List.rev $17; methods = List.rev $20} }
-| CLASS CLASS_NAME COLON NEWLINE
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = List.rev $7; required_vars = []; optional_vars = List.rev $14; methods = List.rev $17} }
+| classheader
     INDENT REQUIRED COLON NEWLINE INDENT vdecls NEWLINE
     DEDENT OPTIONAL COLON NEWLINE INDENT assigns NEWLINE
-    DEDENT optional_fdecls DEDENT { {cname = $2; static_vars = []; required_vars = List.rev $10; optional_vars = List.rev $17; methods = List.rev $20} }
+    DEDENT optional_fdecls DEDENT { {cname = (fst $1); source_class_name = ""; generics = (snd $1); static_vars = []; required_vars = List.rev $7; optional_vars = List.rev $14; methods = List.rev $17} }
+| CLASS CLASS_NAME EQ CLASS_NAME LPAREN typ_list RPAREN { {cname = $2; source_class_name = $4; generics = (List.rev $6); static_vars = []; required_vars = []; optional_vars = []; methods = [] } }
 
 optional_fdecls:
   fdecls { $1 }
@@ -216,6 +221,14 @@ typ:
 array_default:
   non_array_typ LBRACKET expr RBRACKET { (Array ($1), [$3]) }
 | array_default LBRACKET expr RBRACKET { (Array (fst $1), $3::(snd $1)) }
+
+typ_list:
+  typ { [$1] }
+| typ_list COMMA typ { $3::$1 }
+
+class_name_list:
+  CLASS_NAME { [Class $1] }
+| class_name_list COMMA CLASS_NAME { (Class $3)::$1 }
 
 expr:
   INT_LITERAL { IntLiteral $1 }
