@@ -34,6 +34,7 @@ open Ast
 %token <string> CLASS_NAME
 %token <string> IDENTIFIER
 %token <string> OBJ_OPERATOR
+%token <string> OBJ_OPERATOR_METHOD_NAME
 
 /* Set precedence and associativity rules */
 /* https://docs.python.org/3/reference/expressions.html#operator-precedence */
@@ -90,7 +91,8 @@ fdecl:
 | DEF IDENTIFIER LPAREN type_params RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = List.rev $4; body = List.rev $9} }
 | DEF IDENTIFIER LPAREN RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $6; fname = $2; formals = []; body = List.rev $10} }
 | DEF IDENTIFIER LPAREN RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = []; body = List.rev $8} }
-| DEF UNDERSCORE OBJ_OPERATOR LPAREN typ IDENTIFIER RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $9; fname = "_" ^ $3; formals = [($5, $6)]; body = List.rev $13} }
+| DEF OBJ_OPERATOR_METHOD_NAME LPAREN typ IDENTIFIER RPAREN RETURNS typ COLON NEWLINE INDENT stmts DEDENT { {rtype = $8; fname = $2; formals = [($4, $5)]; body = List.rev $12} }
+| DEF OBJ_OPERATOR_METHOD_NAME LPAREN typ IDENTIFIER RPAREN COLON NEWLINE INDENT stmts DEDENT { {rtype = Primitive Void; fname = $2; formals = [($4, $5)]; body = List.rev $10} }
 
 elif:
   ELIF expr COLON NEWLINE INDENT stmts DEDENT { [($2, List.rev $6)] }

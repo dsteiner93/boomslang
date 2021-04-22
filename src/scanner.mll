@@ -24,6 +24,15 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   ("default", DEFAULT);
 ]
 
+let llvm_illegal_chars = [
+  ("%", "pct"); ("&", "amp"); ("\\$", "dol"); ("@", "at"); ("!", "excl");
+  ("#", "pound"); ("\\^", "caret"); ("\\*", "star"); ("/", "slash");
+  ("~", "tilde"); ("\\?", "qstn"); (">", "gt"); ("<", "lt"); (":", "col");
+  ("=", "eq");
+]
+let replace input_str illegal_char = Str.global_replace (Str.regexp (fst illegal_char)) (snd illegal_char) input_str
+let replace_illegal_chars str = List.fold_left replace str llvm_illegal_chars
+
 let strip_firstlast str =
   if String.length str <= 2 then ""
   else String.sub str 1 ((String.length str) - 2)
@@ -121,7 +130,14 @@ rule tokenize = parse
     else
       IDENTIFIER(possible_id)
   }
-| ['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<']+ as lit { OBJ_OPERATOR(lit) }
+| ['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<' ':' '=']+ as lit {
+  (* convert the weird chars to simpler strings so avoid any LLVM errors later on. *)
+  OBJ_OPERATOR((replace_illegal_chars lit))
+}
+| '_'['+' '-' '%' '&' '$' '@' '!' '#' '^' '*' '/' '~' '?' '>' '<' ':' '=']+ as lit {
+  (* convert the weird chars to simpler strings so avoid any LLVM errors later on. *)
+  OBJ_OPERATOR_METHOD_NAME((replace_illegal_chars lit))
+}
 (* Automatically add a NEWLINE to end of all files.
    All statements in Boomslang must end in a NEWLINE, such that
    ordinarily all valid programs must have a blank line at the end.

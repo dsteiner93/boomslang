@@ -1,0 +1,93 @@
+class LinkedList[T]:
+	required:
+		T element
+
+	optional:
+		LinkedList next = NULL
+
+	def _+(LinkedList other) returns LinkedList:
+		# append the other list to this one
+		if self.next == NULL:
+			self.next = other
+			return self
+		else:
+			self.next + other
+			return self
+
+	def _+(T new_element) returns LinkedList:
+		if self.next == NULL:
+			self.next = LinkedList(new_element, NULL)
+			return self
+		else:
+			self.next + LinkedList(new_element, NULL)
+			return self
+
+	def _++(LinkedList other):
+		if self.next == NULL:
+			self.next = other
+		else:
+			self.next ++ other
+
+	def _++(T new_element):
+		if self.next == NULL:
+			self.next = LinkedList(new_element, NULL)
+		else:
+			self.next ++ LinkedList(new_element, NULL)
+
+	def _==(LinkedList other) returns boolean:
+		# Custom defined equality function
+		if self.size() != other.size():
+			return false
+		elif self.next == NULL: # TODO this null check shouldn't be required, need better null handling
+			return (self.element == other.element)
+		else:
+			return (self.element == other.element) and (self.next == other.next)
+
+	def size() returns int:
+		int size = 1
+		LinkedList next_temp = self.next
+		loop while (next_temp != NULL):
+			size += 1
+			next_temp = next_temp.next
+		return size
+
+	def to_string() returns string:
+		string temp = ""
+		if self.next == NULL:
+			return temp + self.element
+		else:
+			return temp + self.element + " -> " + self.next.to_string()
+
+class IntLinkedList = LinkedList(int)
+
+IntLinkedList mylist = IntLinkedList(1)
+mylist + 2 + 3 + 4
+println(mylist.size())
+println(mylist)
+println(mylist.next)
+println(mylist.next.next)
+println(mylist.next.next.next)
+# println(mylist.next.next.next.next) TODO this segfaults, should print NULL
+
+class FloatLinkedList = LinkedList(float)
+FloatLinkedList mylist2 = FloatLinkedList(1.0)
+mylist2 + 2.0
+println(mylist2.size())
+println(mylist2.to_string())
+
+FloatLinkedList mylist3 = FloatLinkedList(3.0, NULL)
+mylist2 + mylist3
+println(mylist2.size())
+println(mylist2)
+
+# Check equality
+IntLinkedList int2 = IntLinkedList(1)
+int2 ++ 2
+int2 ++ 3
+int2 ++ 4
+println(mylist == int2) # should be true
+IntLinkedList int3 = IntLinkedList(1) + 2 + 3
+println(mylist == int3) # should be false
+int3 = int3 + 4
+println(mylist == int3) # should be true
+

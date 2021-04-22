@@ -7,10 +7,10 @@ all : boomslang.native
 
 boomslang.native :
 	opam config exec -- \
-	ocamlbuild -use-ocamlfind boomslang.native
+	ocamlbuild -use-ocamlfind -pkgs str boomslang.native
 
 repl : parser.cmo scanner.cmo ast.cmo sast.cmo semant.cmo repl.cmo
-	ocamlc -w +a-4 -o repl $^
+	ocamlc str.cma -w +a-4 -o repl $^
 
 %.cmo : %.ml
 	ocamlc -w +a-4 -c $<

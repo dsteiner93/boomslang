@@ -1,0 +1,5 @@
+class MyGeneric[G]:
+	required:
+		G g
+def myfunc(MyGeneric g):
+	return

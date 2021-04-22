@@ -37,6 +37,19 @@ let type_is_nullable = function
 | Array(_) -> false
 | NullType -> true
 
+let binop_method_name = function
+  Plus  -> "_+"
+| Subtract -> "_-"
+| Times -> "_star"
+| Divide -> "_slash"
+| Modulo -> "_pct"
+| DoubleEq -> "_eqeq"
+| BoGT -> "_gt"
+| BoLT -> "_lt"
+| BoGTE -> "_gteq"
+| BoLTE -> "_lteq"
+| _ -> raise (Failure("Attempted to use an incompatible binary operator on an object type."))
+
 let are_types_compatible typ1 typ2 =
   ((typ1 = typ2) || (type_is_nullable(typ1) && typ2 = NullType))
 
@@ -191,7 +204,7 @@ let get_generic_to_actual actual_class generic_class =
       if TypMap.mem typ1 map then (* Duplicate type name found *)
         raise (Failure("Found duplicate generic type " ^ (str_of_typ typ1) ^ " in class " ^ generic_class.cname))
       else TypMap.add typ1 typ2 map in
-    List.fold_left2 add_to_map TypMap.empty generic_class.generics actual_class.generics
+    List.fold_left2 add_to_map (TypMap.add (Class(generic_class.cname)) (Class(actual_class.cname)) TypMap.empty) generic_class.generics actual_class.generics
 in
 let generic_map =
 let add_classdecl map = function
@@ -231,7 +244,13 @@ convert_generic_bind generic_to_actual bind =
 and
 convert_generic_ova generic_to_actual ova =
   let ce expr = convert_generic_expr generic_to_actual expr in
-  { ova_expr = (ce ova.ova_expr); ova_class_name = ova.ova_class_name; ova_var_name = ova.ova_var_name; ova_is_static = ova.ova_is_static }
+  if ova.ova_class_name <> "" then
+    let new_class = (convert_generic_typ generic_to_actual (Class(ova.ova_class_name))) in
+    (match new_class with
+       Class(new_name) -> { ova_expr = (ce ova.ova_expr); ova_class_name = new_name; ova_var_name = ova.ova_var_name; ova_is_static = ova.ova_is_static }
+     | _ -> raise (Failure("Somehow converted class type to something that was not a class - this should not be possible.")))
+  else
+    { ova_expr = (ce ova.ova_expr); ova_class_name = ova.ova_class_name; ova_var_name = ova.ova_var_name; ova_is_static = ova.ova_is_static }
 and
 convert_generic_expr generic_to_actual =
   let ce expr = convert_generic_expr generic_to_actual expr in
@@ -239,7 +258,11 @@ convert_generic_expr generic_to_actual =
   function
   Call(FuncCall(name, exprs)) -> Call(FuncCall(name, (ces exprs)))
 | Call(MethodCall(expr1, name, exprs)) -> Call(MethodCall((ce expr1), name, (ces exprs)))
-| ObjectInstantiation(name, exprs) -> ObjectInstantiation(name, (ces exprs))
+| ObjectInstantiation(old_name, exprs) ->
+  let new_class = (convert_generic_typ generic_to_actual (Class(old_name))) in
+  (match new_class with
+     Class(new_name) -> ObjectInstantiation(new_name, (ces exprs))
+   | _ -> raise (Failure("Somehow converted class type to something that was not a class - this should not be possible.")))
 | ObjectVariableAccess(ova) -> ObjectVariableAccess((convert_generic_ova generic_to_actual ova))
 | ArrayAccess(expr1, expr2) -> ArrayAccess((ce expr1), (ce expr2))
 | ArrayLiteral(exprs) -> ArrayLiteral((ces exprs))
@@ -389,21 +412,23 @@ let rec check_fcall fname actuals v_symbol_tables =
     let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
     ((SignatureMap.find matching_signature function_signatures), SCall (SFuncCall(fname, null_safe_checked_exprs)))
 and
-
-check_mcall expr fname actuals v_symbol_tables =
-  let checked_expr = check_expr v_symbol_tables expr in
+check_mcall_prechecked checked_expr fname checked_actuals =
   match ((fst checked_expr)) with
   Class(class_name) ->
     let class_function_signatures = if StringMap.mem class_name class_signatures
                                     then StringMap.find class_name class_signatures
                                     else raise (Failure(("Class name " ^ class_name ^ " not found ")))
     in
-    let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
-    let signature = { fs_name = fname; formal_types = List.map (fst) checked_exprs } in
+    let signature = { fs_name = fname; formal_types = List.map (fst) checked_actuals } in
     let matching_signature = find_matching_signature signature class_function_signatures in
-    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in
+    let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_actuals matching_signature in
     ((SignatureMap.find matching_signature class_function_signatures), SCall (SMethodCall(checked_expr, fname, null_safe_checked_exprs)))
   | _ -> raise (Failure(("Attempted to call method on something that was not a class")))
+and
+check_mcall expr fname actuals v_symbol_tables =
+  let checked_expr = check_expr v_symbol_tables expr in
+  let checked_exprs = List.map (check_expr v_symbol_tables) actuals in
+  check_mcall_prechecked checked_expr fname checked_exprs
 and
 
 check_call v_symbol_tables = function
@@ -642,7 +667,7 @@ coerce_binop_exprs checked_lhs checked_rhs =
   else if rhs_type = Primitive(String) then
     ((wrap_to_string [checked_lhs]), checked_rhs)
   else
-    raise (Failure("No coercrion rule found for " ^ (str_of_typ lhs_type) ^ " and " ^ (str_of_typ rhs_type)))
+    raise (Failure("No coercion rule found for " ^ (str_of_typ lhs_type) ^ " and " ^ (str_of_typ rhs_type)))
 and
 check_binop_coerced checked_lhs binop checked_rhs =
   let lhs_type = (fst checked_lhs) in
@@ -674,11 +699,17 @@ check_binop lhs binop rhs v_symbol_tables =
   (* NULLs are only valid in a ==. As usual, NULLs have to be treated very carefully. *)
   if ((lhs_type = NullType) || (rhs_type = NullType)) && binop = DoubleEq then
     (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
-  else if lhs_type = rhs_type then
-    check_binop_coerced checked_lhs binop checked_rhs
-  else
-    let lhs_rhs = coerce_binop_exprs checked_lhs checked_rhs in
-    check_binop_coerced (fst lhs_rhs) binop (snd lhs_rhs)
+  else (match lhs_type with
+     Class(_) -> (try check_mcall_prechecked checked_lhs (binop_method_name binop) [checked_rhs]
+                  (* check if the user defined an operator override. if they did , we call it like a method *)
+                  with _ -> if binop = DoubleEq then (Primitive(Bool), SBinop(checked_lhs, binop, checked_rhs))
+                            else raise (Failure("Attempted to use a binop on an object that is not supported")))
+  | _ -> (if lhs_type = rhs_type then
+            check_binop_coerced checked_lhs binop checked_rhs
+          else
+            let lhs_rhs = coerce_binop_exprs checked_lhs checked_rhs in
+            check_binop_coerced (fst lhs_rhs) binop (snd lhs_rhs))
+  )
 and
 
 check_object_instantiation class_name exprs v_symbol_tables =
@@ -849,24 +880,27 @@ get_names_from_assign = function
 and
 get_all_class_variable_names classdecl = (List.map get_names_from_assign classdecl.static_vars) @ (List.map (snd) classdecl.required_vars) @ (List.map get_names_from_assign classdecl.optional_vars)
 and
-get_sstmt_from_bind bind =
+get_sstmt_from_bind cname bind =
   let typ = (fst bind) in
   let name = (snd bind) in
-  let sova = { sova_sexpr = (NullType, SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
+  let sova = { sova_sexpr = (Class(cname), SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
   SExpr (typ, SUpdate(SObjectVariableUpdate(sova, Eq, (typ, SId(name)))))
 and
-get_sstmt_from_assign_with_default v_symbol_tables = function
+get_sstmt_from_assign_with_default v_symbol_tables cname = function
   RegularAssign(typ, name, expr) ->
-    let sova = { sova_sexpr = (NullType, SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
-    SExpr (typ, SUpdate(SObjectVariableUpdate(sova, Eq, (check_expr v_symbol_tables expr))))
+    let sova = { sova_sexpr = (Class(cname), SSelf); sova_class_name = ""; sova_var_name = name; sova_is_static = false } in
+    let checked_expr = (check_expr v_symbol_tables expr) in
+    let lhs_type = typ in
+    let converted_null = (lhs_type, (snd checked_expr)) in
+    SExpr (typ, SUpdate(SObjectVariableUpdate(sova, Eq, converted_null)))
 and
 get_required_only_constructor v_symbol_tables classdecl =
-  let body = (List.map get_sstmt_from_bind classdecl.required_vars) @ (List.map (get_sstmt_from_assign_with_default v_symbol_tables) classdecl.optional_vars) in
+  let body = (List.map (get_sstmt_from_bind classdecl.cname) classdecl.required_vars) @ (List.map (get_sstmt_from_assign_with_default v_symbol_tables classdecl.cname) classdecl.optional_vars) in
   { srtype = Primitive(Void); sfname = "construct"; sformals = classdecl.required_vars; sbody = body }
 and
 get_required_and_optional_constructor classdecl =
   let optional_var_binds = (List.map get_bind_from_assign classdecl.optional_vars) in
-  let body = (List.map get_sstmt_from_bind classdecl.required_vars) @ (List.map get_sstmt_from_bind optional_var_binds) in
+  let body = (List.map (get_sstmt_from_bind classdecl.cname) classdecl.required_vars) @ (List.map (get_sstmt_from_bind classdecl.cname) optional_var_binds) in
   { srtype = Primitive(Void); sfname = "construct"; sformals = (classdecl.required_vars @ optional_var_binds); sbody = body }
 and
 get_autogenerated_constructors v_symbol_tables classdecl =

@@ -1,1 +1,1 @@
-Fatal error: exception Failure("No coercrion rule found for boolean and int")
+Fatal error: exception Failure("No coercion rule found for boolean and int")
