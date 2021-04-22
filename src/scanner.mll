@@ -20,6 +20,8 @@ let reserved_word_to_token = List.fold_left add_entry StringMap.empty [
   (* Primitive data types *)
   ("int", INT); ("long", LONG); ("float", FLOAT); ("boolean", BOOLEAN);
   ("char", CHAR); ("string", STRING); ("void", VOID);
+  (* Default keyword for intitializing arrays *)
+  ("default", DEFAULT);
 ]
 
 let strip_firstlast str =

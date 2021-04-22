@@ -22,6 +22,8 @@ open Ast
 %token LPAREN RPAREN LBRACKET RBRACKET COLON PERIOD COMMA UNDERSCORE
 /* Syntactically significant whitespace */
 %token NEWLINE INDENT DEDENT EOF
+/* Misc. Keywords */
+%token DEFAULT
 /* Parameterized tokens */
 %token <int> INT_LITERAL
 %token <int64> LONG_LITERAL
@@ -35,6 +37,7 @@ open Ast
 
 /* Set precedence and associativity rules */
 /* https://docs.python.org/3/reference/expressions.html#operator-precedence */
+%nonassoc DEFAULT
 %right EQ PLUS_EQ MINUS_EQ TIMES_EQ DIVIDE_EQ
 %left OR
 %left AND
@@ -46,6 +49,8 @@ open Ast
 %left PERIOD
 %nonassoc UNARY_MINUS
 %nonassoc FIELD
+%right LBRACKET
+%left RBRACKET
 
 %start program /* the entry point */
 %type <Ast.program> program
@@ -188,13 +193,13 @@ object_variable_access:
 | CLASS_NAME PERIOD IDENTIFIER { { ova_expr = NullExpr; ova_class_name = $1; ova_var_name =  $3; ova_is_static = true } }
 
 array_access:
-  IDENTIFIER LBRACKET expr RBRACKET { ($1, $3) }
+  expr LBRACKET expr RBRACKET { ($1, $3) }
 
 array_literal:
   LBRACKET params RBRACKET { ArrayLiteral (List.rev $2) }
 | LBRACKET RBRACKET { ArrayLiteral ([]) }
 
-typ:
+non_array_typ:
   INT { Primitive Int }
 | LONG { Primitive Long }
 | FLOAT { Primitive Float }
@@ -203,7 +208,14 @@ typ:
 | BOOLEAN { Primitive Bool }
 | VOID { Primitive Void }
 | CLASS_NAME { Class $1 }
-| typ LBRACKET INT_LITERAL RBRACKET { Array ($1, $3) }
+
+typ:
+  non_array_typ { $1 }
+| typ LBRACKET RBRACKET { Array ($1) }
+
+array_default:
+  non_array_typ LBRACKET expr RBRACKET { (Array ($1), [$3]) }
+| array_default LBRACKET expr RBRACKET { (Array (fst $1), $3::(snd $1)) }
 
 expr:
   INT_LITERAL { IntLiteral $1 }
@@ -220,6 +232,7 @@ expr:
 | object_variable_access { ObjectVariableAccess $1 }
 | array_access { ArrayAccess $1 }
 | array_literal { $1 }
+| DEFAULT array_default { DefaultArray ((fst $2), (snd $2)) }
 | LPAREN expr RPAREN { $2 }
 | expr PLUS expr { Binop ($1, Plus, $3) }
 | expr MINUS expr { Binop ($1, Subtract, $3) }
@@ -238,4 +251,3 @@ expr:
 | NOT expr { Unop (Not, $2) }
 | expr OR expr { Binop ($1, BoOr, $3) }
 | expr AND expr { Binop ($1, BoAnd, $3) }
-

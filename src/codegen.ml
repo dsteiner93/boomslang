@@ -78,7 +78,7 @@ let translate sp_units =
   List.fold_left helper StringMap.empty sp_units
   in
   (* Return the LLVM type for a Boomslang type *)
-  let ltype_of_typ = function
+  let rec ltype_of_typ = function
     A.Primitive(A.Int)    -> i32_t
   | A.Primitive(A.Long)   -> i64_t
   | A.Primitive(A.Float)  -> float_t
@@ -89,6 +89,7 @@ let translate sp_units =
   (* Classes, arrays, and null type *)
   (* Classes always get passed around as pointers to the memory where the full struct is stored *)
   | A.Class(class_name)   -> L.pointer_type (StringMap.find class_name class_name_to_named_struct)
+  | A.Array(typ)          -> L.pointer_type (L.array_type (ltype_of_typ typ) 100) (* TODO remove hardcoded 100 *)
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
@@ -106,6 +107,31 @@ let translate sp_units =
   let get_lvalue_of_bool = function
     true -> (L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 1)
   | false -> (L.const_int (ltype_of_typ (A.Primitive(A.Bool))) 0)
+  in
+
+  (* define the default values for all the types *)
+  let rec default_val_of_typ typ builder = match typ with
+    A.Primitive(A.Int)    -> L.const_int i32_t 0
+  | A.Primitive(A.Long)   -> L.const_int i64_t 0
+  | A.Primitive(A.Float)  -> L.const_float float_t 0.0
+  | A.Primitive(A.Char)   -> L.const_int i8_t 0
+  | A.Primitive(A.String) -> L.build_global_stringptr "" "" builder
+  | A.Primitive(A.Bool)   -> L.const_int i1_t 0
+  | A.Class(name)         -> L.const_pointer_null (ltype_of_typ (A.Class(name)))
+  | A.Array(typ)          ->
+      let size = 100 in (* TODO remove hardcoded 100 *)
+      let default = default_val_of_typ typ builder in
+      (* always put the array literal in the heap, maybe find a way to free this memory later *)
+      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) size) "arrp" builder  in
+      (* for each element of the array, set the value to the default value *)
+      let _ = 
+        let rec helper i =
+         if i = size then ()
+         else (
+          ignore (L.build_store default (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] "" builder) builder);
+          helper (i + 1)) in
+        helper 0 in arrp
+  | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
 
   (* create a map of all of the built in functions *)
@@ -178,6 +204,7 @@ let translate sp_units =
     let scdecl = StringMap.find class_name class_name_to_decl in
     List.mem v_name (List.map get_name_of_assign scdecl.sstatic_vars)
   in
+
   (* expression builder *)
   let rec build_expr builder v_symbol_tables (exp : sexpr) = match exp with
     _, SIntLiteral(i)      -> L.const_int i32_t i
@@ -258,6 +285,24 @@ let translate sp_units =
           let expr' = build_expr builder v_symbol_tables expr in
           let gep = L.build_struct_gep expr' index_in_class var_name builder in
           L.build_load gep "" builder)
+  | _, SArrayAccess(sexpr1, sexpr2) ->
+      let n = build_expr builder v_symbol_tables sexpr2 in (* the integer (as an llvalue) we are indexing to *)
+      let arr = build_expr builder v_symbol_tables sexpr1 in
+      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "gep_of_arr" builder in
+      L.build_load elemp ("arr_elem") builder
+  | A.Array(typ) , SArrayLiteral(sexpr_list) ->
+      (* create list of llvalue from the evaluated sexpr list *)
+      let llvalue_arr = List.fold_left (fun s sexpr -> s @ [build_expr builder v_symbol_tables sexpr])
+                         [] sexpr_list in
+      (* always put the array literal in the heap, maybe find a way to free this memory later *)
+      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "arrp" builder  in
+      (* for each element of the array, gep and store value *)
+      let _ = List.fold_left 
+              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] 
+              "" builder) builder); i + 1) 0 llvalue_arr in
+      arrp
+  | A.Array(typ1), SDefaultArray(_, _) ->
+      default_val_of_typ (A.Array(typ1)) builder
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -362,6 +407,25 @@ let translate sp_units =
   | _, SUnop(A.Neg, ((A.Primitive(A.Float), _) as sexpr1)) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1 in
       L.build_fneg sexpr1' "tmp" builder
+  | A.Array(arrtyp), SAssign(SRegularAssign(_, name, sexpr)) ->
+      let arrp = build_expr builder v_symbol_tables sexpr in (* get pointer for arr literal *)
+      let arrp_typ = L.type_of arrp in
+      if List.length v_symbol_tables = 1 then
+        (* Build a global *)
+        let global_symbol_table = List.hd v_symbol_tables in
+        let declared_global = (L.declare_global arrp_typ name the_module) in
+        let _ = L.set_initializer (L.const_null arrp_typ) declared_global in
+        ((StringHash.add global_symbol_table name { llvalue = declared_global; typ = A.Array(arrtyp) });
+        ignore(L.build_store arrp (lookup v_symbol_tables name) builder));
+        arrp
+      else
+        (* Build a local. This means allocating space on the stack, and then
+           storing the value of the expr there. *)
+        let this_scopes_symbol_table = List.hd v_symbol_tables in
+        let new_symbol_table_entry = { llvalue = (L.build_alloca arrp_typ name builder); typ = A.Array(arrtyp) } in
+        ((StringHash.add this_scopes_symbol_table name new_symbol_table_entry);
+        ignore(L.build_store arrp (lookup v_symbol_tables name) builder));
+        arrp
   | _, SAssign(SRegularAssign(typ, name, sexpr)) ->
       (* Variables outside of classes and functions should be globals,
          those inside functions and classes should be locals.
@@ -424,6 +488,13 @@ let translate sp_units =
         else
           (let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
           ignore(L.build_store rhs_expr' gep builder); rhs_expr')
+  | _, SUpdate(SArrayAccessUpdate((sexpr_arr, sexpr_index), A.Eq, sexpr)) ->
+      let newvalue = build_expr builder v_symbol_tables sexpr in
+      let n = build_expr builder v_symbol_tables sexpr_index in (* the integer (as an llvalue) we are indexing to *)
+      let arr = build_expr builder v_symbol_tables sexpr_arr in (* load in arr *)
+      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "" builder in
+      let _ = L.build_store newvalue elemp builder in
+      newvalue
   | _ -> raise (Failure("unimplemented expr in codegen"))
   in
 
