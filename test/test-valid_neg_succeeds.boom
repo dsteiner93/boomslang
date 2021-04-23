@@ -1,2 +1,4 @@
 int x = -1
 x = -x
+println(x)
+

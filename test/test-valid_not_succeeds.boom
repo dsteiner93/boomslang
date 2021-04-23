@@ -1,2 +1,5 @@
 boolean x = true
 not x
+
+println(not x)
+println(x)

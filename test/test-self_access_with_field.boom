@@ -2,6 +2,8 @@ class Foo:
 	optional:
 		string x = "str"
 
-	def myfunc():
-		self.x
+	def myfunc() returns string:
+		return self.x
 
+Foo f = Foo("hello")
+println(f.myfunc())

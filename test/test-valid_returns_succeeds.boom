@@ -5,3 +5,6 @@ def my_func(int x) returns int:
 		return 5
 	return 1
 
+println(my_func(7))
+
+println(my_func(5))

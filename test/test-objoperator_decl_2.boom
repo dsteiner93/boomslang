@@ -1,12 +1,14 @@
 class Horse:
+	required:
+		int x
 	def _^&%$(Horse other) returns Horse:
-		return Horse()
+		return Horse(other.x+self.x)
 
 	def _$%(Horse other) returns Horse:
-		return Horse()
+		return Horse(other.x*self.x)
 
-Horse yak = Horse()
-Horse saddle = Horse()
-Horse poop = Horse()
-Horse winne = yak ^&%$ saddle $% poop
-
+Horse yak = Horse(2)
+Horse saddle = Horse(3)
+Horse poop = Horse(5)
+Horse winnie = yak ^&%$ saddle $% poop
+println(winnie.x)

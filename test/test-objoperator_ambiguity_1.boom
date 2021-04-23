@@ -4,5 +4,5 @@ class Horse:
 
 Horse yak = Horse()
 Horse saddle = Horse()
-int winne = 8 + yak+%saddle + 6
-
+int winnie = 8 + yak +% saddle + 6
+println(winnie)

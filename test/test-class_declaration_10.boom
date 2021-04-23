@@ -4,3 +4,7 @@ class MyObject:
 	optional:
 		int y = 5
 
+MyObject mo = MyObject()
+println(mo.y)
+MyObject no = MyObject(7)
+println(no.y)

@@ -4,3 +4,4 @@ class MyObject:
 	required:
 		int y
 
+println(MyObject(10).y)

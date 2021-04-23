@@ -5,3 +5,4 @@ class MyObject:
 MyObject myobject = MyObject()
 boolean x = true and myobject.is_this_true
 
+println(x)

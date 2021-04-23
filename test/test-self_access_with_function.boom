@@ -5,4 +5,6 @@ class MyClass:
 
 	def myfunction2():
 		self.myfunction(2 % 3)
-
+MyClass m = MyClass()
+m.myfunction(6)
+m.myfunction2()

@@ -2,5 +2,6 @@ class MyObject:
 	required:
 		int heY
 MyObject myobject = MyObject(5)
-myobject.heY /= 20
+println(myobject.heY /= 20)
+
 
