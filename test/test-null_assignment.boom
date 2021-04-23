@@ -3,3 +3,4 @@ class MyObject:
 		println("hey")
 
 MyObject x = NULL
+x.myfunc()

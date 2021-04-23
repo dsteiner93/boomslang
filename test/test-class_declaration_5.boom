@@ -4,3 +4,9 @@ class MyObject:
 	def mymethod2(int x) returns int:
 		return 5
 
+MyObject a = MyObject()
+MyObject b = MyObject()
+
+MyObject x = a ++%% b
+
+println(x.mymethod2(4))

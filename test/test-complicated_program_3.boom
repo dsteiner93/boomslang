@@ -5,6 +5,7 @@ def myfunc(int x, float foo) returns void:
 	if x > 5:
 		if x > 10:
 			int z = 20
+			println(z)
 		elif x > 20:
 			println("hey")
 		elif x > 30:
@@ -12,4 +13,7 @@ def myfunc(int x, float foo) returns void:
 			println("hey")
 		else:
 			println("hey")
+			println(z)
 
+myfunc(15,20.83)
+myfunc(7,20.76)
