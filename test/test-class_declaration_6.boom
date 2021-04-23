@@ -2,3 +2,5 @@ class MyObject:
 	static:
 		int x = 5
 
+MyObject foo = MyObject()
+println(foo.x)
