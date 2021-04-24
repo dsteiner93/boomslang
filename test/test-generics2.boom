@@ -36,10 +36,10 @@ class LinkedList[T]:
 
 	def _==(LinkedList other) returns boolean:
 		# Custom defined equality function
-		if self.size() != other.size():
+		if self == NULL:
+			return other == NULL
+		elif other == NULL:
 			return false
-		elif self.next == NULL: # TODO this null check shouldn't be required, need better null handling
-			return (self.element == other.element)
 		else:
 			return (self.element == other.element) and (self.next == other.next)
 
@@ -53,7 +53,9 @@ class LinkedList[T]:
 
 	def to_string() returns string:
 		string temp = ""
-		if self.next == NULL:
+		if self == NULL:
+			return "NULL"
+		elif self.next == NULL:
 			return temp + self.element
 		else:
 			return temp + self.element + " -> " + self.next.to_string()
@@ -67,7 +69,10 @@ println(mylist)
 println(mylist.next)
 println(mylist.next.next)
 println(mylist.next.next.next)
-# println(mylist.next.next.next.next) TODO this segfaults, should print NULL
+
+IntLinkedList nulllist = mylist.next.next.next.next
+println(nulllist)
+println(mylist.next.next.next.next)
 
 class FloatLinkedList = LinkedList(float)
 FloatLinkedList mylist2 = FloatLinkedList(1.0)

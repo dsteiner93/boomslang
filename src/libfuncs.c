@@ -64,3 +64,40 @@ int compare_strings(const char *s1, const char *s2)
 {
     return (strcmp(s1, s2) == 0);
 }
+
+void check_int_not_zero(int i, char *message)
+{
+    if (i == 0)
+    {
+        fprintf(stderr, "%s\n", message);
+        exit(1);
+    }
+}
+
+void check_long_not_zero(long l, char *message)
+{
+    if (l == 0)
+    {
+        fprintf(stderr, "%s\n", message);
+        exit(1);
+    }
+}
+
+void check_float_not_zero(float f, char *message)
+{
+    if (f == 0.0)
+    {
+        fprintf(stderr, "%s\n", message);
+        exit(1);
+    }
+}
+
+void check_not_null(void *p)
+{
+    // Inspired by https://www.cs.cornell.edu/courses/cs6120/2019fa/blog/null-pointer-guards/
+    if (p == NULL)
+    {
+        fprintf(stderr, "NullPointerException\n");
+        exit(1);
+    }
+}

@@ -1,0 +1,6 @@
+class MyClass:
+	optional:
+		long mylong = 0L
+
+MyClass foo = MyClass()
+2 % foo.mylong

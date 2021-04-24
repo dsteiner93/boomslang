@@ -18,7 +18,6 @@ module S = Semant
 open Sast 
 
 module StringMap = Map.Make(String)
-(*module SignatureMap = Map.Make(struct type t = function_signature let compare = compare end)*)
 module SignatureMap = S.SignatureMap
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
@@ -51,6 +50,12 @@ let get_class_name kind v_symbol_tables = function
   (_, SSelf) -> lookup_class_name v_symbol_tables "self"
 | (A.Class(class_name), _) -> class_name
 | _ -> raise (Failure("The LHS expression of a " ^ kind ^ " is expected to be a class type."))
+
+let check_not_zero_fname = function
+  A.Primitive(A.Int) -> "check_int_not_zero"
+| A.Primitive(A.Long) -> "check_long_not_zero"
+| A.Primitive(A.Float) -> "check_float_not_zero"
+| _ -> raise (Failure("check_not_zero is not supported for the given type."))
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
@@ -142,7 +147,7 @@ let translate sp_units =
      List.map convert Semant.built_in_funcs in
    let helper m e = match e with fun_name, ret_t, arg_ts -> 
     let arg_t_arr = Array.of_list 
-                    (List.fold_left (fun s e -> s @ [ltype_of_typ e]) [] arg_ts) in
+                    (List.fold_left (fun s e -> s @ (if (e = (A.Primitive(A.Void))) then [(L.pointer_type i8_t)] else [ltype_of_typ e])) [] arg_ts) in
     let func = L.declare_function fun_name 
               (L.var_arg_function_type (ltype_of_typ ret_t) arg_t_arr) the_module in
     let signature = { fs_name = fun_name; formal_types = arg_ts } in
@@ -244,9 +249,10 @@ let translate sp_units =
           let class_signatures = StringMap.find class_name class_signature_map in
           let signature = S.find_matching_signature signature_with_possible_nulls class_signatures in
           if SignatureMap.mem signature class_signatures then (* is a user defined method *)
+            let expr' = build_expr builder v_symbol_tables expr in
             L.build_call (SignatureMap.find signature class_signatures)
-            (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
-            [] (expr::expr_list)))
+            (Array.of_list (expr'::(List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
+            [] (expr_list))))
             (if typ = A.Primitive(A.Void) then "" else (class_name ^ "_" ^ method_name ^ "_res"))
             builder
           else raise (Failure ("method " ^ method_name ^ " not found on class " ^ class_name))
@@ -282,7 +288,10 @@ let translate sp_units =
           L.build_load (lookup v_symbol_tables static_var_name) static_var_name builder)
        else
          (let index_in_class = (get_index_in_class class_name var_name) in
+          (* Check that the object whose variable we are trying to access isn't null *)
           let expr' = build_expr builder v_symbol_tables expr in
+          let bitcast = L.build_bitcast expr' (L.pointer_type i8_t) "bcast" builder in
+          let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
           let gep = L.build_struct_gep expr' index_in_class var_name builder in
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
@@ -351,8 +360,18 @@ let translate sp_units =
           A.Plus         -> L.build_add
         | A.Subtract     -> L.build_sub
         | A.Times        -> L.build_mul
-        | A.Divide       -> L.build_sdiv (* signed division*)
-        | A.Modulo       -> L.build_srem (* signed remainder *)
+        | A.Divide       ->
+          (* Check no divide by zero *)
+          let typ = (fst sexpr1) in
+          let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
+          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          L.build_sdiv (* signed division*)
+        | A.Modulo       ->
+          (* Check no mod by zero *)
+          let typ = (fst sexpr1) in
+          let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
+          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          L.build_srem (* signed remainder *)
         | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (* ordered and equal to *)
         | A.BoGT         -> L.build_icmp L.Icmp.Sgt (* ordered and greater than *)
         | A.BoLT         -> L.build_icmp L.Icmp.Slt (* ordered and less than *)
@@ -368,8 +387,18 @@ let translate sp_units =
           A.Plus         -> L.build_fadd
         | A.Subtract     -> L.build_fsub
         | A.Times        -> L.build_fmul
-        | A.Divide       -> L.build_fdiv (* signed division*)
-        | A.Modulo       -> L.build_frem (* signed remainder *)
+        | A.Divide       ->
+          (* Check no divide by zero *)
+          let typ = (fst sexpr1) in
+          let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
+          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          L.build_fdiv (* signed division*)
+        | A.Modulo       ->
+          (* Check no mod by zero *)
+          let typ = (fst sexpr1) in
+          let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
+          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          L.build_frem (* signed remainder *)
         | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (* ordered and equal to *)
         | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (* ordered and greater than *)
         | A.BoLT         -> L.build_fcmp L.Fcmp.Olt (* ordered and less than *)
@@ -486,8 +515,11 @@ let translate sp_units =
           let static_var_name = get_static_var_name class_name var_name in
           build_expr builder v_symbol_tables (typ, SUpdate(SRegularUpdate(static_var_name, A.Eq, rhs_sexpr)))
         else
-          (let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
-          ignore(L.build_store rhs_expr' gep builder); rhs_expr')
+          (* First check the LHS is not null before assigning to it. *)
+          (let bitcast = L.build_bitcast lhs_expr' (L.pointer_type i8_t) "bcast" builder in
+           let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
+           let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
+           ignore(L.build_store rhs_expr' gep builder); rhs_expr')
   | _, SUpdate(SArrayAccessUpdate((sexpr_arr, sexpr_index), A.Eq, sexpr)) ->
       let newvalue = build_expr builder v_symbol_tables sexpr in
       let n = build_expr builder v_symbol_tables sexpr_index in (* the integer (as an llvalue) we are indexing to *)

@@ -29,6 +29,10 @@ let built_in_funcs = [
   ({ fs_name = "int_to_float"; formal_types = [Primitive(Int)] }, Primitive(Float));
   ({ fs_name = "concat_strings"; formal_types = [Primitive(String); Primitive(String)] }, Primitive(String)); 
   ({ fs_name = "compare_strings"; formal_types = [Primitive(String); Primitive(String)] }, Primitive(Bool));
+  ({ fs_name = "check_int_not_zero"; formal_types = [Primitive(Int); Primitive(String)] }, Primitive(Void) );
+  ({ fs_name = "check_long_not_zero"; formal_types = [Primitive(Long); Primitive(String)] }, Primitive(Void) );
+  ({ fs_name = "check_float_not_zero"; formal_types = [Primitive(Float); Primitive(String)] }, Primitive(Void) );
+  ({ fs_name = "check_not_null"; formal_types = [Primitive(Void)] }, Primitive(Void) );
 ]
 
 let type_is_nullable = function

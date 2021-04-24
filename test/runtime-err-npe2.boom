@@ -1,0 +1,6 @@
+class MyClass:
+	required:
+		int x
+
+MyClass foo = NULL
+foo.x += 5
