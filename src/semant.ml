@@ -412,6 +412,10 @@ let rec check_fcall fname actuals v_symbol_tables =
       | _ -> checked_exprs in
     let signature = { fs_name = fname; formal_types = List.map (fst) wrapped_checked_exprs } in
     if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, wrapped_checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
+  (* Let len() pass through semant, len() is not a built in func and is in fact implemented as an LLVM function in codegen, therefore
+     let codegen handle error checking for len() *)
+  else if fname = "len" && List.length actuals = 1 then
+    Primitive(Int), SCall (SFuncCall(fname, checked_exprs))
   else
     let matching_signature = find_matching_signature signature function_signatures in
     let null_safe_checked_exprs = convert_nulls_in_checked_exprs checked_exprs matching_signature in

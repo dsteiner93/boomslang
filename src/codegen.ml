@@ -34,6 +34,12 @@ module ArrayTypHash = Hashtbl.Make(struct
   let hash = Hashtbl.hash (* generic hash function *)
 end)
 
+module SignatureHash = Hashtbl.Make(struct
+  type t = function_signature (* type of keys *)
+  let equal x y = x = y (* use structural comparison *)
+  let hash = Hashtbl.hash (* generic hash function *)
+end)
+
 type symbol_table_entry = {
   llvalue: L.llvalue;
   typ: A.typ;
@@ -93,6 +99,8 @@ let translate sp_units =
   
   let len_func_table = ArrayTypHash.create 10 in
 
+  let built_in_table = SignatureHash.create 10 in
+
   (* get array from array struct pointer *)
   let arrp_from_arrstruct s builder =
     L.build_struct_gep s 0 "arrp_from_arrstruct" builder in
@@ -142,8 +150,8 @@ let translate sp_units =
       let sizep = size_from_arrstruct loaded_formal func_builder in
       let loaded_size = L.build_load sizep "size" func_builder in
       let signature = { fs_name = "llint_to_ocamlint" ; formal_types = [A.Primitive(A.Int)] } in
-      let _ = L.build_call (SignatureMap.find signature built_in_map) [| loaded_size |] "" func_builder in
-      let _ = L.build_ret (L.const_int i32_t 0) func_builder in ()
+      let size = L.build_call (SignatureHash.find built_in_table signature) [| loaded_size |] "" func_builder in
+      let _ = L.build_ret size func_builder in ()
     )
     else  ()  in  
 
@@ -219,19 +227,19 @@ let translate sp_units =
 
 
   (* create a map of all of the built in functions *)
-  let built_in_map =
+  let _ =
    let built_in_funcs : (string * A.typ * (A.typ list)) list =
      let convert (fs : (function_signature * A.typ)) =
        (((fst fs).fs_name), (snd fs), ((fst fs).formal_types)) in
      List.map convert Semant.built_in_funcs in
-   let helper m e = match e with fun_name, ret_t, arg_ts -> 
+   let helper e = match e with fun_name, ret_t, arg_ts -> 
     let arg_t_arr = Array.of_list 
                     (List.fold_left (fun s e -> s @ (if (e = (A.Primitive(A.Void))) then [(L.pointer_type i8_t)] else [ltype_of_typ e])) [] arg_ts) in
     let func = L.declare_function fun_name 
               (L.var_arg_function_type (ltype_of_typ ret_t) arg_t_arr) the_module in
     let signature = { fs_name = fun_name; formal_types = arg_ts } in
-    SignatureMap.add signature func m in
-   List.fold_left helper SignatureMap.empty built_in_funcs in
+    SignatureHash.add built_in_table signature func in
+   List.iter helper built_in_funcs in
 
   (* create a map of all the user defined functions *)
   let user_func_map =
@@ -305,11 +313,13 @@ let translate sp_units =
   | typ, SCall(sc) -> (match sc with
       (* Nulls must be handled with care *)
         SFuncCall("null_to_string", [(_, SNullExpr)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
+      | SFuncCall("len", [(arrtyp, expr)])  -> L.build_call (ArrayTypHash.find len_func_table arrtyp) 
+                                                [| build_expr builder v_symbol_tables (arrtyp, expr) |] "len_call" builder
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
           let signature_with_possible_nulls = { fs_name = func_name; formal_types = expr_typs } in
-          if SignatureMap.mem signature_with_possible_nulls built_in_map then (* is a built in func *)
-            L.build_call (SignatureMap.find signature_with_possible_nulls built_in_map)
+          if SignatureHash.mem built_in_table signature_with_possible_nulls then (* is a built in func *)
+            L.build_call (SignatureHash.find built_in_table signature_with_possible_nulls)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
@@ -370,7 +380,7 @@ let translate sp_units =
           (* Check that the object whose variable we are trying to access isn't null *)
           let expr' = build_expr builder v_symbol_tables expr in
           let bitcast = L.build_bitcast expr' (L.pointer_type i8_t) "bcast" builder in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) ) (Array.of_list [bitcast]) "" builder in
           let gep = L.build_struct_gep expr' index_in_class var_name builder in
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
@@ -439,7 +449,7 @@ let translate sp_units =
              so we call our own C function here. *)
           | A.Primitive(A.String) ->
               let signature = { fs_name = "compare_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
-              L.build_call (SignatureMap.find signature built_in_map)
+              L.build_call (SignatureHash.find built_in_table signature)
                 (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
                 (signature.fs_name ^ "_res") builder
           | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder (* TODO this is just a placeholder *)
@@ -458,13 +468,13 @@ let translate sp_units =
           (* Check no divide by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_sdiv (* signed division*)
         | A.Modulo       ->
           (* Check no mod by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_srem (* signed remainder *)
         | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (* ordered and equal to *)
         | A.BoGT         -> L.build_icmp L.Icmp.Sgt (* ordered and greater than *)
@@ -485,13 +495,13 @@ let translate sp_units =
           (* Check no divide by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_fdiv (* signed division*)
         | A.Modulo       ->
           (* Check no mod by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) ) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_frem (* signed remainder *)
         | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (* ordered and equal to *)
         | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (* ordered and greater than *)
@@ -505,7 +515,7 @@ let translate sp_units =
       (match binop with
           A.Plus         ->
             let signature = { fs_name = "concat_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
-            L.build_call (SignatureMap.find signature built_in_map)
+            L.build_call (SignatureHash.find built_in_table signature)
               (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
               (signature.fs_name ^ "_res") builder
         | _ -> raise (Failure("Found ineligible binop for string operands"))
@@ -611,7 +621,7 @@ let translate sp_units =
         else
           (* First check the LHS is not null before assigning to it. *)
           (let bitcast = L.build_bitcast lhs_expr' (L.pointer_type i8_t) "bcast" builder in
-           let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
+           let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] })) (Array.of_list [bitcast]) "" builder in
            let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
            ignore(L.build_store rhs_expr' gep builder); rhs_expr')
   | _, SUpdate(SArrayAccessUpdate((sexpr_arr, sexpr_index), A.Eq, sexpr)) ->
