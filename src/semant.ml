@@ -33,7 +33,6 @@ let built_in_funcs = [
   ({ fs_name = "check_long_not_zero"; formal_types = [Primitive(Long); Primitive(String)] }, Primitive(Void) );
   ({ fs_name = "check_float_not_zero"; formal_types = [Primitive(Float); Primitive(String)] }, Primitive(Void) );
   ({ fs_name = "check_not_null"; formal_types = [Primitive(Void)] }, Primitive(Void) );
-  ({ fs_name = "llint_to_ocamlint"; formal_types = [Primitive(Int)] }, Primitive(Int) );
 ]
 
 let type_is_nullable = function
@@ -498,11 +497,13 @@ check_array_assign lhs_name lhs_element_type this_scopes_v_table checked_expr =
     Array(rhs_element_type) ->
       if rhs_size = 0 then
         (* If the RHS is 0, then the types don't matter, since it can match any type *)
-        ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
+        let converted_checked_expr = (lhs_type, (snd checked_expr)) in
+        ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_checked_expr)))
       else if (type_is_nullable lhs_element_type) && ((lhs_element_type = rhs_element_type) || (rhs_element_type = NullType)) then
         (* If the LHS is a nullable type, the array literal could be like [NULL, NULL, NULL] in which
            case its element type will be NullType, but it should still match an array like MyArray[] *)
-        ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, checked_expr)))
+        let converted_checked_expr = (lhs_type, (snd checked_expr)) in
+        ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_checked_expr)))
       else if (rhs_type = lhs_type) then
         (* If we reached this point, the element type is not allowed to be null and it is non-zero. So the
            types need to directly match. *)
@@ -640,10 +641,15 @@ check_array_literal exprs v_symbol_tables =
   let typ = Array(element_typ) in (typ, (SArrayLiteral null_safe_checked_exprs))
 and
 
+check_expr_is_int_literal = function
+  SIntLiteral(_) -> ()
+| _              -> raise (Failure ("default arrays must be intitialized with int literals at this time"))
+and
 check_default_array typ exprs v_symbol_tables = match typ with
   Array(_) -> let _ = check_class_exists_nested typ in
               let checked_exprs = List.map (check_expr v_symbol_tables) exprs in
               let _ = List.iter (check_type_is_int) (List.map fst checked_exprs) in
+              let _ = List.iter (check_expr_is_int_literal) (List.map snd checked_exprs) in
               (typ, SDefaultArray(typ, checked_exprs))
 | _        -> raise (Failure ("Attempted to create a default non-array type"))
 and

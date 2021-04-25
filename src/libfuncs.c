@@ -101,8 +101,3 @@ void check_not_null(void *p)
         exit(1);
     }
 }
-
-int llint_to_ocamlint(int i)
-{
-		return i;
-}
