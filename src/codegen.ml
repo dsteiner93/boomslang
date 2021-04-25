@@ -17,10 +17,25 @@ module A = Ast
 module S = Semant
 open Sast 
 
+
 module StringMap = Map.Make(String)
 module SignatureMap = S.SignatureMap
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
+  let equal x y = x = y (* use structural comparison *)
+  let hash = Hashtbl.hash (* generic hash function *)
+end)
+(* rather then defining all the array types, create a hashtable and only define the ones that 
+ * are used in this program. This is because there are infinite types of arrays 
+ * eg. int[] , int[][], int[][][], ... *)
+module ArrayTypHash = Hashtbl.Make(struct
+  type t = A.typ (* type of keys *)
+  let equal x y = x = y (* use structural comparison *)
+  let hash = Hashtbl.hash (* generic hash function *)
+end)
+
+module SignatureHash = Hashtbl.Make(struct
+  type t = function_signature (* type of keys *)
   let equal x y = x = y (* use structural comparison *)
   let hash = Hashtbl.hash (* generic hash function *)
 end)
@@ -45,7 +60,7 @@ let rec lookup_class_name v_symbol_tables s =
               with Not_found -> (lookup_class_name tl s)
 
 let get_static_var_name class_name var_name = class_name ^ "." ^ var_name
-
+  
 let get_class_name kind v_symbol_tables = function
   (_, SSelf) -> lookup_class_name v_symbol_tables "self"
 | (A.Class(class_name), _) -> class_name
@@ -59,6 +74,7 @@ let check_not_zero_fname = function
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
+
   let context    = L.global_context () in
   
   (* Create the LLVM compilation module into which
@@ -75,6 +91,24 @@ let translate sp_units =
   and void_t     = L.void_type          context
   in
 
+  (* arrays are implemented as a struct in Boomslang, this is so the length and the array itself
+     can be put in one container. this hashtable stores all of the array types in the input program.
+     The reason that it is a hashtable and not a predefined list is because there are infinitely many
+     array types *)
+  let arrtyp_table = ArrayTypHash.create 10 in
+  
+  let len_func_table = ArrayTypHash.create 10 in
+
+  let built_in_table = SignatureHash.create 10 in
+
+  (* get array from array struct pointer *)
+  let arrp_from_arrstruct s builder =
+    L.build_struct_gep s 0 "arrp_from_arrstruct" builder in
+  
+  (* get size of array from array struct pointer *)
+  let size_from_arrstruct s builder =
+    L.build_struct_gep s 1 "" builder in
+
   (* Need to build a struct type for every class *)
   let class_name_to_named_struct =
     let helper m e = match e with
@@ -82,6 +116,45 @@ let translate sp_units =
     | _ -> m in
   List.fold_left helper StringMap.empty sp_units
   in
+  
+  (* get sting from typ *) 
+  let rec typ_to_string = function 
+    A.Primitive(A.Int)    -> "int"
+  | A.Primitive(A.Long)   -> "long"
+  | A.Primitive(A.Float)  -> "float"
+  | A.Primitive(A.Char)   -> "char"
+  | A.Primitive(A.String) -> "string"
+  | A.Primitive(A.Bool)   -> "bool"
+  | A.Primitive(A.Void)   -> "void"
+  | A.Class(class_name)   -> class_name
+  | A.Array(typ)            -> ("array_of_" ^ (typ_to_string typ)) in
+
+  (* remove option from type, WARNING: use this wisely! *) 
+  let remove_option stro = match stro with
+    None -> raise (Failure ("attemted to evaluate None option"))
+  | Some x -> x in
+
+  (* create llvm len() function for the given array type *)
+  let create_len_func (typ : A.typ) =
+    if (not (ArrayTypHash.mem len_func_table typ)) then (
+      let t = if ArrayTypHash.mem arrtyp_table typ then 
+                ArrayTypHash.find arrtyp_table typ 
+              else raise (Failure ("arrtyp is not in table")) in
+      let func = L.define_function "len" (L.var_arg_function_type i32_t [| L.pointer_type t |]) the_module in
+      let _ = ArrayTypHash.add len_func_table typ func in
+      let func_builder = L.builder_at_end context (L.entry_block func) in
+      let alloc = L.build_alloca (L.pointer_type t) "" func_builder in          (* make space on the stack *)
+      let formal = List.hd (Array.to_list (L.params func)) in  (* get the llvalue of the only formal argument *)
+      let stored_formal = L.build_store formal alloc func_builder in
+      let loaded_formal = L.build_load alloc "" func_builder in
+      let sizep = size_from_arrstruct loaded_formal func_builder in
+      let loaded_size = L.build_load sizep "size" func_builder in
+      let signature = { fs_name = "llint_to_ocamlint" ; formal_types = [A.Primitive(A.Int)] } in
+      let size = L.build_call (SignatureHash.find built_in_table signature) [| loaded_size |] "" func_builder in
+      let _ = L.build_ret size func_builder in ()
+    )
+    else  ()  in  
+
   (* Return the LLVM type for a Boomslang type *)
   let rec ltype_of_typ = function
     A.Primitive(A.Int)    -> i32_t
@@ -94,7 +167,31 @@ let translate sp_units =
   (* Classes, arrays, and null type *)
   (* Classes always get passed around as pointers to the memory where the full struct is stored *)
   | A.Class(class_name)   -> L.pointer_type (StringMap.find class_name class_name_to_named_struct)
-  | A.Array(typ)          -> L.pointer_type (L.array_type (ltype_of_typ typ) 100) (* TODO remove hardcoded 100 *)
+  | A.Array(typ)          -> 
+    let rec helper typ suffix = (* returns the typ of the array *)
+      if ArrayTypHash.mem arrtyp_table typ then
+        ArrayTypHash.find arrtyp_table typ 
+      else (
+        match typ with 
+          A.Array(A.Array(ityp))  -> (* is an array of arrays *)
+          let lityp = helper (A.Array(ityp)) "[]" in
+          let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
+          L.struct_set_body arr_t [| (L.pointer_type (L.pointer_type lityp)) ; i32_t |] false;
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          create_len_func typ;
+          arr_t
+        | A.Array(ityp) -> (* is an array of primitives *)
+          let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
+          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false;
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          create_len_func typ;
+          arr_t
+      ) 
+    in 
+    if ArrayTypHash.mem arrtyp_table (A.Array(typ)) then   (* check if array struct is already in hashtable *)
+      L.pointer_type (ArrayTypHash.find arrtyp_table (A.Array(typ))) 
+    else 
+      L.pointer_type (helper (A.Array(typ)) "[]")
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
@@ -123,36 +220,26 @@ let translate sp_units =
   | A.Primitive(A.String) -> L.build_global_stringptr "" "" builder
   | A.Primitive(A.Bool)   -> L.const_int i1_t 0
   | A.Class(name)         -> L.const_pointer_null (ltype_of_typ (A.Class(name)))
-  | A.Array(typ)          ->
-      let size = 100 in (* TODO remove hardcoded 100 *)
-      let default = default_val_of_typ typ builder in
-      (* always put the array literal in the heap, maybe find a way to free this memory later *)
-      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) size) "arrp" builder  in
-      (* for each element of the array, set the value to the default value *)
-      let _ = 
-        let rec helper i =
-         if i = size then ()
-         else (
-          ignore (L.build_store default (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] "" builder) builder);
-          helper (i + 1)) in
-        helper 0 in arrp
+  (* TODO: make the default type for arrays be an array of size 0 *)
   | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
 
+
+
   (* create a map of all of the built in functions *)
-  let built_in_map =
+  let _ =
    let built_in_funcs : (string * A.typ * (A.typ list)) list =
      let convert (fs : (function_signature * A.typ)) =
        (((fst fs).fs_name), (snd fs), ((fst fs).formal_types)) in
      List.map convert Semant.built_in_funcs in
-   let helper m e = match e with fun_name, ret_t, arg_ts -> 
+   let helper e = match e with fun_name, ret_t, arg_ts -> 
     let arg_t_arr = Array.of_list 
                     (List.fold_left (fun s e -> s @ (if (e = (A.Primitive(A.Void))) then [(L.pointer_type i8_t)] else [ltype_of_typ e])) [] arg_ts) in
     let func = L.declare_function fun_name 
               (L.var_arg_function_type (ltype_of_typ ret_t) arg_t_arr) the_module in
     let signature = { fs_name = fun_name; formal_types = arg_ts } in
-    SignatureMap.add signature func m in
-   List.fold_left helper SignatureMap.empty built_in_funcs in
+    SignatureHash.add built_in_table signature func in
+   List.iter helper built_in_funcs in
 
   (* create a map of all the user defined functions *)
   let user_func_map =
@@ -226,11 +313,13 @@ let translate sp_units =
   | typ, SCall(sc) -> (match sc with
       (* Nulls must be handled with care *)
         SFuncCall("null_to_string", [(_, SNullExpr)]) -> build_expr builder v_symbol_tables (A.Primitive(A.String), SStringLiteral("NULL"))
+      | SFuncCall("len", [(arrtyp, expr)])  -> L.build_call (ArrayTypHash.find len_func_table arrtyp) 
+                                                [| build_expr builder v_symbol_tables (arrtyp, expr) |] "len_call" builder
       | SFuncCall(func_name, expr_list) ->
           let expr_typs = List.fold_left (fun s (t, _) -> s @ [t]) [] expr_list in
           let signature_with_possible_nulls = { fs_name = func_name; formal_types = expr_typs } in
-          if SignatureMap.mem signature_with_possible_nulls built_in_map then (* is a built in func *)
-            L.build_call (SignatureMap.find signature_with_possible_nulls built_in_map)
+          if SignatureHash.mem built_in_table signature_with_possible_nulls then (* is a built in func *)
+            L.build_call (SignatureHash.find built_in_table signature_with_possible_nulls)
             (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e])
             [] expr_list))
             (if typ = A.Primitive(A.Void) then "" else (func_name ^ "_res"))
@@ -291,27 +380,42 @@ let translate sp_units =
           (* Check that the object whose variable we are trying to access isn't null *)
           let expr' = build_expr builder v_symbol_tables expr in
           let bitcast = L.build_bitcast expr' (L.pointer_type i8_t) "bcast" builder in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) ) (Array.of_list [bitcast]) "" builder in
           let gep = L.build_struct_gep expr' index_in_class var_name builder in
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
       let n = build_expr builder v_symbol_tables sexpr2 in (* the integer (as an llvalue) we are indexing to *)
-      let arr = build_expr builder v_symbol_tables sexpr1 in
-      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "gep_of_arr" builder in
-      L.build_load elemp ("arr_elem") builder
+      (* TODO: check this value n (which is an llvalue of i32_t, to see if its within bounds *)
+      let structp = build_expr builder v_symbol_tables sexpr1 in
+      let arrpp = arrp_from_arrstruct structp builder in
+      let arrp = L.build_load arrpp "arr" builder in
+      let elemp = L.build_gep arrp [| n |] "gep_of_arr" builder in
+      L.build_load elemp "arr_elem" builder
   | A.Array(typ) , SArrayLiteral(sexpr_list) ->
       (* create list of llvalue from the evaluated sexpr list *)
       let llvalue_arr = List.fold_left (fun s sexpr -> s @ [build_expr builder v_symbol_tables sexpr])
                          [] sexpr_list in
+      
       (* always put the array literal in the heap, maybe find a way to free this memory later *)
-      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "arrp" builder  in
+      let arrt = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "" builder in
+      (* 'cast' this llvm array type into of a pointer type *)
+      let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
       (* for each element of the array, gep and store value *)
       let _ = List.fold_left 
-              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] 
+              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t i |] 
               "" builder) builder); i + 1) 0 llvalue_arr in
-      arrp
-  | A.Array(typ1), SDefaultArray(_, _) ->
-      default_val_of_typ (A.Array(typ1)) builder
+      (* malloc the array struct and put the necessary elements inside *)
+      let struct_tp = ltype_of_typ (A.Array(typ)) in                  (* get the arr struct pointer *)
+      let struct_t = L.element_type struct_tp in       
+      let structp = L.build_malloc struct_t "arr_structp" builder in
+
+      let _ = 
+        L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+        L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
+
+      structp
+  | A.Array(typ1), SDefaultArray(_, size) ->
+      L.const_int i32_t 0
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -345,7 +449,7 @@ let translate sp_units =
              so we call our own C function here. *)
           | A.Primitive(A.String) ->
               let signature = { fs_name = "compare_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
-              L.build_call (SignatureMap.find signature built_in_map)
+              L.build_call (SignatureHash.find built_in_table signature)
                 (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
                 (signature.fs_name ^ "_res") builder
           | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder (* TODO this is just a placeholder *)
@@ -364,13 +468,13 @@ let translate sp_units =
           (* Check no divide by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_sdiv (* signed division*)
         | A.Modulo       ->
           (* Check no mod by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_srem (* signed remainder *)
         | A.DoubleEq     -> L.build_icmp L.Icmp.Eq (* ordered and equal to *)
         | A.BoGT         -> L.build_icmp L.Icmp.Sgt (* ordered and greater than *)
@@ -391,13 +495,13 @@ let translate sp_units =
           (* Check no divide by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("DivideByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] })) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_fdiv (* signed division*)
         | A.Modulo       ->
           (* Check no mod by zero *)
           let typ = (fst sexpr1) in
           let error_message = build_expr builder v_symbol_tables ((A.Primitive(A.String)), SStringLiteral("ModByZeroException")) in
-          let _ = L.build_call (SignatureMap.find ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) built_in_map) (Array.of_list [sexpr2'; error_message]) "" builder in
+          let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = (check_not_zero_fname typ); formal_types = [typ; A.Primitive(A.String)] }) ) (Array.of_list [sexpr2'; error_message]) "" builder in
           L.build_frem (* signed remainder *)
         | A.DoubleEq     -> L.build_fcmp L.Fcmp.Oeq (* ordered and equal to *)
         | A.BoGT         -> L.build_fcmp L.Fcmp.Ogt (* ordered and greater than *)
@@ -411,7 +515,7 @@ let translate sp_units =
       (match binop with
           A.Plus         ->
             let signature = { fs_name = "concat_strings"; formal_types = [(fst sexpr1); (fst sexpr2)] } in
-            L.build_call (SignatureMap.find signature built_in_map)
+            L.build_call (SignatureHash.find built_in_table signature)
               (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
               (signature.fs_name ^ "_res") builder
         | _ -> raise (Failure("Found ineligible binop for string operands"))
@@ -517,14 +621,15 @@ let translate sp_units =
         else
           (* First check the LHS is not null before assigning to it. *)
           (let bitcast = L.build_bitcast lhs_expr' (L.pointer_type i8_t) "bcast" builder in
-           let _ = L.build_call (SignatureMap.find ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] }) built_in_map) (Array.of_list [bitcast]) "" builder in
+           let _ = L.build_call (SignatureHash.find built_in_table ({ fs_name = "check_not_null"; formal_types = [A.Primitive(A.Void)] })) (Array.of_list [bitcast]) "" builder in
            let gep = L.build_struct_gep lhs_expr' (get_index_in_class class_name var_name) var_name builder in
            ignore(L.build_store rhs_expr' gep builder); rhs_expr')
   | _, SUpdate(SArrayAccessUpdate((sexpr_arr, sexpr_index), A.Eq, sexpr)) ->
       let newvalue = build_expr builder v_symbol_tables sexpr in
       let n = build_expr builder v_symbol_tables sexpr_index in (* the integer (as an llvalue) we are indexing to *)
-      let arr = build_expr builder v_symbol_tables sexpr_arr in (* load in arr *)
-      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "" builder in
+      let structp = build_expr builder v_symbol_tables sexpr_arr in (* load in structp *)
+      let arrp = L.build_load (arrp_from_arrstruct structp builder) "arr" builder in
+      let elemp = L.build_gep arrp [| n |] "gep_of_arr" builder in
       let _ = L.build_store newvalue elemp builder in
       newvalue
   | _ -> raise (Failure("unimplemented expr in codegen"))
@@ -673,6 +778,11 @@ let translate sp_units =
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
   let main_builder = L.builder_at_end context (L.entry_block main_func) in
+
+  (*
+  let a = ltype_of_typ (A.Array(A.Array(A.Array(A.Primitive(A.Int))))) in
+  let b = L.build_malloc a "test" main_builder in
+  *)
 
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
