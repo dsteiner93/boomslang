@@ -85,8 +85,19 @@ let translate sp_units =
   and void_t     = L.void_type          context
   in
 
-  (* define the hashtable of array types *)
+  (* arrays are implemented as a struct in Boomslang, this is so the length and the array itself
+     can be put in one container. this hashtable stores all of the array types in the input program.
+     The reason that it is a hashtable and not a predefined list is because there are infinitely many
+     array types *)
   let arrtyp_table = ArrayTypHash.create 10 in
+
+  (* get array from array struct pointer *)
+  let arrp_from_arrstruct s builder =
+    L.build_struct_gep s 0 "" builder in
+  
+  (* get size of array from array struct pointer *)
+  let size_from_arrstruct s builder =
+    L.build_struct_gep s 1 "" builder in
 
   (* Need to build a struct type for every class *)
   let class_name_to_named_struct =
@@ -145,7 +156,7 @@ let translate sp_units =
     if ArrayTypHash.mem arrtyp_table typ then
       ArrayTypHash.find arrtyp_table typ (* if array type already in hashtable simply return it *)
     else 
-      helper typ "[]"
+      helper (A.Array(typ)) "[]"
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
@@ -349,20 +360,29 @@ let translate sp_units =
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
       let n = build_expr builder v_symbol_tables sexpr2 in (* the integer (as an llvalue) we are indexing to *)
-      let arr = build_expr builder v_symbol_tables sexpr1 in
-      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "gep_of_arr" builder in
+      let structp = build_expr builder v_symbol_tables sexpr1 in
+      let arrpp = arrp_from_arrstruct structp builder in
+      let arrp = L.build_load arrpp "arr" builder in
+      let elemp = L.build_gep arrp [| n |] "gep_of_arr" builder in
       L.build_load elemp ("arr_elem") builder
   | A.Array(typ) , SArrayLiteral(sexpr_list) ->
       (* create list of llvalue from the evaluated sexpr list *)
       let llvalue_arr = List.fold_left (fun s sexpr -> s @ [build_expr builder v_symbol_tables sexpr])
                          [] sexpr_list in
       (* always put the array literal in the heap, maybe find a way to free this memory later *)
-      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "arrp" builder  in
+      let arrt = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "" builder  in
+      (* 'cast' this llvm array type into of a pointer type *)
+      let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
       (* for each element of the array, gep and store value *)
       let _ = List.fold_left 
-              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] 
+              (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t i |] 
               "" builder) builder); i + 1) 0 llvalue_arr in
-      arrp
+      (* malloc the array struct and put the necessary elements inside *)
+      let structp = L.build_malloc (ltype_of_typ (A.Array(typ))) "arr_structp" builder in
+      let _ =
+        L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+        L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
+      structp
   | A.Array(typ1), SDefaultArray(_, _) ->
       default_val_of_typ (A.Array(typ1)) builder
   (* == is the only binop that can apply to any two types. *)
