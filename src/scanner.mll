@@ -32,9 +32,10 @@ let llvm_illegal_chars = [
 ]
 
 let replace input_str illegal_char = Str.global_replace (Str.regexp (fst illegal_char)) (snd illegal_char) input_str
-let replace_illegal_chars str = List.fold_left replace str llvm_illegal_chars 
+let replace_illegal_chars str = List.fold_left replace str llvm_illegal_chars
 
 let convert_slashes str = 
+  let str = Str.matched_string str in
   let orig_len = String.length str in
   let new_len = orig_len / 2 in
   String.sub str 0 new_len
@@ -109,7 +110,7 @@ rule tokenize = parse
 | '\'' [' '-'~'] '\'' as lit { CHAR_LITERAL( (strip_firstlast lit).[0] ) }
 (* String literals in Boomslang cannot contain double quotes or newlines.
    String literals are a " followed by any non newline or double quote
-   followed by " *)
+   followed by " regex copied from CORAL*)
 |  '"' [^'"''\\']* ('\\'_[^'"''\\']* )* '"' as lit { let stripped = (strip_firstlast lit) in let fix_slashes = Str.global_substitute (Str.regexp "[\\]+") convert_slashes stripped in STRING_LITERAL(fix_slashes)}
 (* Syntactically meaningful whitespace - tabs for indentation only *)
 (* Either a single-line comment appears on a line by itself, in which case
