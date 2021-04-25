@@ -152,11 +152,11 @@ let translate sp_units =
           ArrayTypHash.add arrtyp_table typ arr_t;
           L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
       ) 
-    in
-    if ArrayTypHash.mem arrtyp_table typ then
-      ArrayTypHash.find arrtyp_table typ (* if array type already in hashtable simply return it *)
+    in 
+    if ArrayTypHash.mem arrtyp_table typ then   (* check if array struct is already in hashtable *)
+      L.pointer_type (ArrayTypHash.find arrtyp_table typ) 
     else 
-      helper (A.Array(typ)) "[]"
+      L.pointer_type (helper (A.Array(typ)) "[]")
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
@@ -185,19 +185,7 @@ let translate sp_units =
   | A.Primitive(A.String) -> L.build_global_stringptr "" "" builder
   | A.Primitive(A.Bool)   -> L.const_int i1_t 0
   | A.Class(name)         -> L.const_pointer_null (ltype_of_typ (A.Class(name)))
-  | A.Array(typ)          ->
-      let size = 100 in (* TODO remove hardcoded 100 *)
-      let default = default_val_of_typ typ builder in
-      (* always put the array literal in the heap, maybe find a way to free this memory later *)
-      let arrp = L.build_malloc (L.array_type (ltype_of_typ typ) size) "arrp" builder  in
-      (* for each element of the array, set the value to the default value *)
-      let _ = 
-        let rec helper i =
-         if i = size then ()
-         else (
-          ignore (L.build_store default (L.build_gep arrp [| L.const_int i64_t 0 ; L.const_int i64_t i |] "" builder) builder);
-          helper (i + 1)) in
-        helper 0 in arrp
+  (* TODO: make the default type for arrays be an array of size 0 *)
   | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
 
@@ -360,6 +348,7 @@ let translate sp_units =
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
       let n = build_expr builder v_symbol_tables sexpr2 in (* the integer (as an llvalue) we are indexing to *)
+      (* TODO: check this value n (which is an llvalue of i32_t, to see if its within bounds *)
       let structp = build_expr builder v_symbol_tables sexpr1 in
       let arrpp = arrp_from_arrstruct structp builder in
       let arrp = L.build_load arrpp "arr" builder in
@@ -378,13 +367,15 @@ let translate sp_units =
               (fun i e ->  ignore (L.build_store e (L.build_gep arrp [| L.const_int i64_t i |] 
               "" builder) builder); i + 1) 0 llvalue_arr in
       (* malloc the array struct and put the necessary elements inside *)
-      let structp = L.build_malloc (ltype_of_typ (A.Array(typ))) "arr_structp" builder in
+      let struct_tp = ltype_of_typ (A.Array(typ)) in                  (* get the arr struct pointer *)
+      let struct_t = L.element_type struct_tp in       
+      let structp = L.build_malloc struct_t "arr_structp" builder in
       let _ =
         L.build_store arrp (arrp_from_arrstruct structp builder) builder;
         L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
       structp
-  | A.Array(typ1), SDefaultArray(_, _) ->
-      default_val_of_typ (A.Array(typ1)) builder
+  | A.Array(typ1), SDefaultArray(_, size) ->
+      L.const_int i32_t 0
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
@@ -596,8 +587,9 @@ let translate sp_units =
   | _, SUpdate(SArrayAccessUpdate((sexpr_arr, sexpr_index), A.Eq, sexpr)) ->
       let newvalue = build_expr builder v_symbol_tables sexpr in
       let n = build_expr builder v_symbol_tables sexpr_index in (* the integer (as an llvalue) we are indexing to *)
-      let arr = build_expr builder v_symbol_tables sexpr_arr in (* load in arr *)
-      let elemp = L.build_gep arr [| L.const_int i64_t 0 ; n |] "" builder in
+      let structp = build_expr builder v_symbol_tables sexpr_arr in (* load in structp *)
+      let arrp = L.build_load (arrp_from_arrstruct structp builder) "arr" builder in
+      let elemp = L.build_gep arrp [| n |] "gep_of_arr" builder in
       let _ = L.build_store newvalue elemp builder in
       newvalue
   | _ -> raise (Failure("unimplemented expr in codegen"))
