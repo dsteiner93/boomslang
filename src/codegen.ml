@@ -90,6 +90,8 @@ let translate sp_units =
      The reason that it is a hashtable and not a predefined list is because there are infinitely many
      array types *)
   let arrtyp_table = ArrayTypHash.create 10 in
+  
+  let len_func_table = ArrayTypHash.create 10 in
 
   (* get array from array struct pointer *)
   let arrp_from_arrstruct s builder =
@@ -124,6 +126,27 @@ let translate sp_units =
     None -> raise (Failure ("attemted to evaluate None option"))
   | Some x -> x in
 
+  (* create llvm len() function for the given array type *)
+  let create_len_func (typ : A.typ) =
+    if (not (ArrayTypHash.mem len_func_table typ)) then (
+      let t = if ArrayTypHash.mem arrtyp_table typ then 
+                ArrayTypHash.find arrtyp_table typ 
+              else raise (Failure ("arrtyp is not in table")) in
+      let func = L.define_function "len" (L.var_arg_function_type i32_t [| L.pointer_type t |]) the_module in
+      let _ = ArrayTypHash.add len_func_table typ func in
+      let func_builder = L.builder_at_end context (L.entry_block func) in
+      let alloc = L.build_alloca (L.pointer_type t) "" func_builder in          (* make space on the stack *)
+      let formal = List.hd (Array.to_list (L.params func)) in  (* get the llvalue of the only formal argument *)
+      let stored_formal = L.build_store formal alloc func_builder in
+      let loaded_formal = L.build_load alloc "" func_builder in
+      let sizep = size_from_arrstruct loaded_formal func_builder in
+      let loaded_size = L.build_load sizep "size" func_builder in
+      let signature = { fs_name = "llint_to_ocamlint" ; formal_types = [A.Primitive(A.Int)] } in
+      let _ = L.build_call (SignatureMap.find signature built_in_map) [| loaded_size |] "" func_builder in
+      let _ = L.build_ret (L.const_int i32_t 0) func_builder in ()
+    )
+    else  ()  in  
+
   (* Return the LLVM type for a Boomslang type *)
   let rec ltype_of_typ = function
     A.Primitive(A.Int)    -> i32_t
@@ -145,12 +168,16 @@ let translate sp_units =
           A.Array(A.Array(ityp))  -> (* is an array of arrays *)
           let lityp = helper (A.Array(ityp)) "[]" in
           let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
+          L.struct_set_body arr_t [| (L.pointer_type (L.pointer_type lityp)) ; i32_t |] false;
           ArrayTypHash.add arrtyp_table typ arr_t;
-          L.struct_set_body arr_t [| (L.pointer_type (L.pointer_type lityp)) ; i32_t |] false; arr_t
+          create_len_func typ;
+          arr_t
         | A.Array(ityp) -> (* is an array of primitives *)
           let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
+          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false;
           ArrayTypHash.add arrtyp_table typ arr_t;
-          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
+          create_len_func typ;
+          arr_t
       ) 
     in 
     if ArrayTypHash.mem arrtyp_table (A.Array(typ)) then   (* check if array struct is already in hashtable *)

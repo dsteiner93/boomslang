@@ -33,6 +33,7 @@ let built_in_funcs = [
   ({ fs_name = "check_long_not_zero"; formal_types = [Primitive(Long); Primitive(String)] }, Primitive(Void) );
   ({ fs_name = "check_float_not_zero"; formal_types = [Primitive(Float); Primitive(String)] }, Primitive(Void) );
   ({ fs_name = "check_not_null"; formal_types = [Primitive(Void)] }, Primitive(Void) );
+  ({ fs_name = "llint_to_ocamlint"; formal_types = [Primitive(Int)] }, Primitive(Int) );
 ]
 
 let type_is_nullable = function
