@@ -1,6 +1,5 @@
-string[3] arr = ["one", "two", "three"]
+string[] arr = ["one", "two", "three"]
 arr[1] = "newvalue"
-arr[1]
 int i = 0
 loop i=i+1 while i<3:
 	println(arr[i])

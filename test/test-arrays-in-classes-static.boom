@@ -3,6 +3,6 @@ class MyObject:
 		int[] arr = [0,1,2]
 
 MyObject a = MyObject()
-i = 0
+int i = 0
 loop i += 1 while i < 3:
 	println(a.arr[i])

@@ -1,0 +1,6 @@
+int[] arr = [1,2,3]
+int[] arrCopy = [2,3,4]
+arrCopy = arr
+int i = 0
+loop i += 1 while i < 3:
+	println(arrCopy[i])
