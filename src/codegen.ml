@@ -117,18 +117,6 @@ let translate sp_units =
   List.fold_left helper StringMap.empty sp_units
   in
   
-  (* get sting from typ *) 
-  let rec typ_to_string = function 
-    A.Primitive(A.Int)    -> "int"
-  | A.Primitive(A.Long)   -> "long"
-  | A.Primitive(A.Float)  -> "float"
-  | A.Primitive(A.Char)   -> "char"
-  | A.Primitive(A.String) -> "string"
-  | A.Primitive(A.Bool)   -> "bool"
-  | A.Primitive(A.Void)   -> "void"
-  | A.Class(class_name)   -> class_name
-  | A.Array(typ)            -> ("array_of_" ^ (typ_to_string typ)) in
-
   (* remove option from type, WARNING: use this wisely! *) 
   let remove_option stro = match stro with
     None -> raise (Failure ("attemted to evaluate None option"))
@@ -179,11 +167,12 @@ let translate sp_units =
           create_len_func typ;
           arr_t
         | A.Array(ityp) -> (* is an array of primitives *)
-          let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
+          let arr_t = L.named_struct_type context ((str_of_typ ityp) ^ suffix) in
           L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false;
           ArrayTypHash.add arrtyp_table typ arr_t;
           create_len_func typ;
           arr_t
+       | _ -> raise (Failure ("ltyp_of_typ failure"))
       ) 
     in 
     if ArrayTypHash.mem arrtyp_table (A.Array(typ)) then   (* check if array struct is already in hashtable *)
@@ -221,8 +210,6 @@ let translate sp_units =
   (* TODO: make the default type for arrays be an array of size 0 *)
   | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
-
-
 
   (* create a map of all of the built in functions *)
   let _ =
@@ -383,7 +370,6 @@ let translate sp_units =
           L.build_load gep "" builder)
   | _, SArrayAccess(sexpr1, sexpr2) ->
       let n = build_expr builder v_symbol_tables sexpr2 in (* the integer (as an llvalue) we are indexing to *)
-      (* TODO: check this value n (which is an llvalue of i32_t, to see if its within bounds *)
       let structp = build_expr builder v_symbol_tables sexpr1 in
       let arrpp = arrp_from_arrstruct structp builder in
       let arrp = L.build_load arrpp "arr" builder in
@@ -425,9 +411,9 @@ let translate sp_units =
        A.Array(ityp), fst::[]  ->
          let arrt = L.build_malloc (L.array_type (ltype_of_typ ityp) fst) "arrt" builder in
          let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
-         let rec helper counter = match counter with 
-           i when counter < 0 -> ()
-         | i -> L.build_store default_val (L.build_gep arrp [| L.const_int i64_t i |] "" builder) builder; helper (i - 1) in
+         let rec helper i = match i with 
+           _ when i < 0 -> ()
+         | _ -> L.build_store default_val (L.build_gep arrp [| L.const_int i64_t i |] "" builder) builder; helper (i - 1) in
          let _ = helper (fst - 1) in
          (* malloc the actual array *)
          let struct_tp = ltype_of_typ typ in
@@ -441,9 +427,9 @@ let translate sp_units =
          (* get the array type *)
          let arrt = L.build_malloc (L.array_type (ltype_of_typ ityp) fst) "arrt" builder in
          let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
-         let rec helper counter = match counter with 
-           i when counter < 0 -> ()
-         | i -> 
+         let rec helper i = match i with 
+           _ when i < 0 -> ()
+         | _ -> 
              L.build_store (build_arr ityp snd) (L.build_gep arrp [| L.const_int i64_t i |] "" builder) 
                             builder; helper (i - 1) in
          let _ = helper (fst - 1) in
