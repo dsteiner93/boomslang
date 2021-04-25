@@ -93,7 +93,7 @@ let translate sp_units =
 
   (* get array from array struct pointer *)
   let arrp_from_arrstruct s builder =
-    L.build_struct_gep s 0 "" builder in
+    L.build_struct_gep s 0 "arrp_from_arrstruct" builder in
   
   (* get size of array from array struct pointer *)
   let size_from_arrstruct s builder =
@@ -146,15 +146,15 @@ let translate sp_units =
           let lityp = helper (A.Array(ityp)) "[]" in
           let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
           ArrayTypHash.add arrtyp_table typ arr_t;
-          L.struct_set_body arr_t [| (L.pointer_type lityp) ; i32_t |] false; arr_t
+          L.struct_set_body arr_t [| (L.pointer_type (L.pointer_type lityp)) ; i32_t |] false; arr_t
         | A.Array(ityp) -> (* is an array of primitives *)
           let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
           ArrayTypHash.add arrtyp_table typ arr_t;
           L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
       ) 
     in 
-    if ArrayTypHash.mem arrtyp_table typ then   (* check if array struct is already in hashtable *)
-      L.pointer_type (ArrayTypHash.find arrtyp_table typ) 
+    if ArrayTypHash.mem arrtyp_table (A.Array(typ)) then   (* check if array struct is already in hashtable *)
+      L.pointer_type (ArrayTypHash.find arrtyp_table (A.Array(typ))) 
     else 
       L.pointer_type (helper (A.Array(typ)) "[]")
   | _                     -> void_t (* TODO remove this and fill in other types *)
@@ -353,13 +353,14 @@ let translate sp_units =
       let arrpp = arrp_from_arrstruct structp builder in
       let arrp = L.build_load arrpp "arr" builder in
       let elemp = L.build_gep arrp [| n |] "gep_of_arr" builder in
-      L.build_load elemp ("arr_elem") builder
+      L.build_load elemp "arr_elem" builder
   | A.Array(typ) , SArrayLiteral(sexpr_list) ->
       (* create list of llvalue from the evaluated sexpr list *)
       let llvalue_arr = List.fold_left (fun s sexpr -> s @ [build_expr builder v_symbol_tables sexpr])
                          [] sexpr_list in
+      
       (* always put the array literal in the heap, maybe find a way to free this memory later *)
-      let arrt = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "" builder  in
+      let arrt = L.build_malloc (L.array_type (ltype_of_typ typ) (List.length sexpr_list)) "" builder in
       (* 'cast' this llvm array type into of a pointer type *)
       let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
       (* for each element of the array, gep and store value *)
@@ -370,9 +371,11 @@ let translate sp_units =
       let struct_tp = ltype_of_typ (A.Array(typ)) in                  (* get the arr struct pointer *)
       let struct_t = L.element_type struct_tp in       
       let structp = L.build_malloc struct_t "arr_structp" builder in
-      let _ =
+
+      let _ = 
         L.build_store arrp (arrp_from_arrstruct structp builder) builder;
         L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
+
       structp
   | A.Array(typ1), SDefaultArray(_, size) ->
       L.const_int i32_t 0
@@ -738,7 +741,12 @@ let translate sp_units =
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
   let main_builder = L.builder_at_end context (L.entry_block main_func) in
-  
+
+  (*
+  let a = ltype_of_typ (A.Array(A.Array(A.Array(A.Primitive(A.Int))))) in
+  let b = L.build_malloc a "test" main_builder in
+  *)
+
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
     SStmt(ss)       -> build_stmt main_func v_symbol_tables builder ss
