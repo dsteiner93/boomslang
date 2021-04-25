@@ -148,9 +148,7 @@ let translate sp_units =
       let stored_formal = L.build_store formal alloc func_builder in
       let loaded_formal = L.build_load alloc "" func_builder in
       let sizep = size_from_arrstruct loaded_formal func_builder in
-      let loaded_size = L.build_load sizep "size" func_builder in
-      let signature = { fs_name = "llint_to_ocamlint" ; formal_types = [A.Primitive(A.Int)] } in
-      let size = L.build_call (SignatureHash.find built_in_table signature) [| loaded_size |] "" func_builder in
+      let size = L.build_load sizep "size" func_builder in
       let _ = L.build_ret size func_builder in ()
     )
     else  ()  in  
@@ -414,8 +412,15 @@ let translate sp_units =
         L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
 
       structp
-  | A.Array(typ1), SDefaultArray(_, size) ->
-      L.const_int i32_t 0
+  | A.Array(typ1), SDefaultArray(_, sexprs) ->
+      let base_typ = 
+        let rec helper typ = match typ with
+          A.Array(ityp) -> helper ityp
+        | _             -> typ in
+        helper typ1 in
+     let default_val = default_val_of_typ base_typ builder in (* get the default value *)
+     L.const_int i32_t 0
+
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
       let sexpr1' = build_expr builder v_symbol_tables sexpr1
