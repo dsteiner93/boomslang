@@ -89,8 +89,8 @@ let rec str_of_typ = function
 | Primitive(String) -> "string"
 | Primitive(Bool) -> "boolean"
 | Primitive(Void) -> "void"
-| Class(str) -> "Class(" ^ str ^ ")"
-| Array(typ) -> (str_of_typ typ) ^ "[]"
+| Class(str) -> "Class_" ^ str ^ "_"
+| Array(typ) -> "Array_" ^ (str_of_typ typ) ^ "_"
 | NullType -> "NULL"
 
 let get_label_with_type suffixed_name unsuffixed_name typ = suffixed_name ^ " [label=\"" ^ unsuffixed_name ^ " (" ^ (str_of_typ typ) ^ ")\"]"

@@ -1,0 +1,6 @@
+class MyObject:
+	static:
+		int x = 0
+
+
+println([ [NULL, NULL], [MyObject(), MyObject()] ])
