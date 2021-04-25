@@ -17,10 +17,19 @@ module A = Ast
 module S = Semant
 open Sast 
 
+
 module StringMap = Map.Make(String)
 module SignatureMap = S.SignatureMap
 module StringHash = Hashtbl.Make(struct
   type t = string (* type of keys *)
+  let equal x y = x = y (* use structural comparison *)
+  let hash = Hashtbl.hash (* generic hash function *)
+end)
+(* rather then defining all the array types, create a hashtable and only define the ones that 
+ * are used in this program. This is because there are infinite types of arrays 
+ * eg. int[] , int[][], int[][][], ... *)
+module ArrayTypHash = Hashtbl.Make(struct
+  type t = A.typ (* type of keys *)
   let equal x y = x = y (* use structural comparison *)
   let hash = Hashtbl.hash (* generic hash function *)
 end)
@@ -45,7 +54,7 @@ let rec lookup_class_name v_symbol_tables s =
               with Not_found -> (lookup_class_name tl s)
 
 let get_static_var_name class_name var_name = class_name ^ "." ^ var_name
-
+  
 let get_class_name kind v_symbol_tables = function
   (_, SSelf) -> lookup_class_name v_symbol_tables "self"
 | (A.Class(class_name), _) -> class_name
@@ -59,6 +68,7 @@ let check_not_zero_fname = function
 
 (* translate : Sast.program -> Llvm.module *)
 let translate sp_units =
+
   let context    = L.global_context () in
   
   (* Create the LLVM compilation module into which
@@ -74,6 +84,9 @@ let translate sp_units =
   and str_t      = L.pointer_type       (L.i8_type context)
   and void_t     = L.void_type          context
   in
+
+  (* define the hashtable of array types *)
+  let arrtyp_table = ArrayTypHash.create 10 in
 
   (* Need to build a struct type for every class *)
   let class_name_to_named_struct =
@@ -138,6 +151,37 @@ let translate sp_units =
         helper 0 in arrp
   | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
+
+  let rec typ_to_string = function 
+    A.Primitive(A.Int)      -> "int"
+  | A.Primitive(A.String)   -> "string"
+  | A.Array(typ)            -> ("array_of_" ^ (typ_to_string typ)) in
+
+  let remove_option stro = match stro with
+    None -> raise (Failure ("attemted to evaluate None option"))
+  | Some x -> x in
+
+  let get_arr_ltyp typ =
+    let rec helper typ suffix = (* returns the typ of the array *)
+      if ArrayTypHash.mem arrtyp_table typ then
+        ArrayTypHash.find arrtyp_table typ 
+      else (
+        match typ with 
+          A.Array(A.Array(ityp))  -> (* is an array of arrays *)
+          let lityp = helper (A.Array(ityp)) "[]" in
+          let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          L.struct_set_body arr_t [| (L.pointer_type lityp) ; i32_t |] false; arr_t
+        | A.Array(ityp) -> (* is an array of primitives *)
+          let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
+      ) 
+    in
+    if ArrayTypHash.mem arrtyp_table typ then
+      ArrayTypHash.find arrtyp_table typ
+    else 
+      helper typ "[]" in
 
   (* create a map of all of the built in functions *)
   let built_in_map =
@@ -673,6 +717,18 @@ let translate sp_units =
   let main_func : L.llvalue =
     L.define_function "main" main_t the_module in
   let main_builder = L.builder_at_end context (L.entry_block main_func) in
+  
+  let _ = 
+   let first = get_arr_ltyp (A.Array(A.Primitive(A.Int))) in
+   L.build_malloc first "a_test" main_builder in
+  
+  let _ = 
+   let first = get_arr_ltyp (A.Array(A.Array(A.Primitive(A.Int)))) in
+   L.build_malloc first "b_test" main_builder in
+  
+  let _ = 
+   let first = get_arr_ltyp (A.Array(A.Array(A.Primitive(A.String)))) in
+   L.build_malloc first "b_test" main_builder in
 
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
