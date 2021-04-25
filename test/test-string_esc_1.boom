@@ -1,0 +1,4 @@
+def print_extras(string str):
+	println(str)
+
+print_extras("backslashes \o")
