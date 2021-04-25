@@ -95,6 +95,24 @@ let translate sp_units =
     | _ -> m in
   List.fold_left helper StringMap.empty sp_units
   in
+  
+  (* get sting from typ *) 
+  let rec typ_to_string = function 
+    A.Primitive(A.Int)    -> "int"
+  | A.Primitive(A.Long)   -> "long"
+  | A.Primitive(A.Float)  -> "float"
+  | A.Primitive(A.Char)   -> "char"
+  | A.Primitive(A.String) -> "string"
+  | A.Primitive(A.Bool)   -> "bool"
+  | A.Primitive(A.Void)   -> "void"
+  | A.Class(class_name)   -> class_name
+  | A.Array(typ)            -> ("array_of_" ^ (typ_to_string typ)) in
+
+  (* remove option from type, WARNING: use this wisely! *) 
+  let remove_option stro = match stro with
+    None -> raise (Failure ("attemted to evaluate None option"))
+  | Some x -> x in
+
   (* Return the LLVM type for a Boomslang type *)
   let rec ltype_of_typ = function
     A.Primitive(A.Int)    -> i32_t
@@ -107,7 +125,27 @@ let translate sp_units =
   (* Classes, arrays, and null type *)
   (* Classes always get passed around as pointers to the memory where the full struct is stored *)
   | A.Class(class_name)   -> L.pointer_type (StringMap.find class_name class_name_to_named_struct)
-  | A.Array(typ)          -> L.pointer_type (L.array_type (ltype_of_typ typ) 100) (* TODO remove hardcoded 100 *)
+  | A.Array(typ)          -> 
+    let rec helper typ suffix = (* returns the typ of the array *)
+      if ArrayTypHash.mem arrtyp_table typ then
+        ArrayTypHash.find arrtyp_table typ 
+      else (
+        match typ with 
+          A.Array(A.Array(ityp))  -> (* is an array of arrays *)
+          let lityp = helper (A.Array(ityp)) "[]" in
+          let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          L.struct_set_body arr_t [| (L.pointer_type lityp) ; i32_t |] false; arr_t
+        | A.Array(ityp) -> (* is an array of primitives *)
+          let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
+          ArrayTypHash.add arrtyp_table typ arr_t;
+          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
+      ) 
+    in
+    if ArrayTypHash.mem arrtyp_table typ then
+      ArrayTypHash.find arrtyp_table typ (* if array type already in hashtable simply return it *)
+    else 
+      helper typ "[]"
   | _                     -> void_t (* TODO remove this and fill in other types *)
   in
   let get_bind_from_assign = function
@@ -152,36 +190,7 @@ let translate sp_units =
   | _                     -> L.const_null i32_t (* TODO remove this and fill in other types *)
   in
 
-  let rec typ_to_string = function 
-    A.Primitive(A.Int)      -> "int"
-  | A.Primitive(A.String)   -> "string"
-  | A.Array(typ)            -> ("array_of_" ^ (typ_to_string typ)) in
 
-  let remove_option stro = match stro with
-    None -> raise (Failure ("attemted to evaluate None option"))
-  | Some x -> x in
-
-  let get_arr_ltyp typ =
-    let rec helper typ suffix = (* returns the typ of the array *)
-      if ArrayTypHash.mem arrtyp_table typ then
-        ArrayTypHash.find arrtyp_table typ 
-      else (
-        match typ with 
-          A.Array(A.Array(ityp))  -> (* is an array of arrays *)
-          let lityp = helper (A.Array(ityp)) "[]" in
-          let arr_t = L.named_struct_type context ((remove_option (L.struct_name lityp)) ^ suffix) in
-          ArrayTypHash.add arrtyp_table typ arr_t;
-          L.struct_set_body arr_t [| (L.pointer_type lityp) ; i32_t |] false; arr_t
-        | A.Array(ityp) -> (* is an array of primitives *)
-          let arr_t = L.named_struct_type context ((typ_to_string ityp) ^ suffix) in
-          ArrayTypHash.add arrtyp_table typ arr_t;
-          L.struct_set_body arr_t [| (L.pointer_type (ltype_of_typ ityp)) ; i32_t |] false; arr_t
-      ) 
-    in
-    if ArrayTypHash.mem arrtyp_table typ then
-      ArrayTypHash.find arrtyp_table typ
-    else 
-      helper typ "[]" in
 
   (* create a map of all of the built in functions *)
   let built_in_map =
@@ -718,18 +727,6 @@ let translate sp_units =
     L.define_function "main" main_t the_module in
   let main_builder = L.builder_at_end context (L.entry_block main_func) in
   
-  let _ = 
-   let first = get_arr_ltyp (A.Array(A.Primitive(A.Int))) in
-   L.build_malloc first "a_test" main_builder in
-  
-  let _ = 
-   let first = get_arr_ltyp (A.Array(A.Array(A.Primitive(A.Int)))) in
-   L.build_malloc first "b_test" main_builder in
-  
-  let _ = 
-   let first = get_arr_ltyp (A.Array(A.Array(A.Primitive(A.String)))) in
-   L.build_malloc first "b_test" main_builder in
-
   (* program builder *) 
   let build_program v_symbol_tables builder (spunit : sp_unit) = match spunit with
     SStmt(ss)       -> build_stmt main_func v_symbol_tables builder ss
