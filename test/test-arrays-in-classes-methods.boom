@@ -1,0 +1,12 @@
+class Family:
+	optional:
+		string[][] relation = default string[4][4]
+
+	def updateFathersName(string newName):
+		self.arr[0][0] = newName
+
+Family Doe = Family(["Typo","Stephanie","Jim","Kate"]["father","mother","son","daughter"])
+Doe.updateFathersName("John")
+i = 0
+loop i += 1 while i < 3:
+	println(Doe.relation[0][i] + " is " + Doe.relation[1][i])
