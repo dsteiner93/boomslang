@@ -419,7 +419,41 @@ let translate sp_units =
         | _             -> typ in
         helper typ1 in
      let default_val = default_val_of_typ base_typ builder in (* get the default value *)
-     L.const_int i32_t 0
+     (* evaluate exprs into int list *)
+     let ints = List.fold_left (fun s e -> match e with _, SIntLiteral(v) -> v::s) [] sexprs in
+     let rec build_arr typ expr_list = match typ, expr_list with
+       A.Array(ityp), fst::[]  ->
+         let arrt = L.build_malloc (L.array_type (ltype_of_typ ityp) fst) "arrt" builder in
+         let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
+         let rec helper counter = match counter with 
+           i when counter < 0 -> ()
+         | i -> L.build_store default_val (L.build_gep arrp [| L.const_int i64_t i |] "" builder) builder; helper (i - 1) in
+         let _ = helper (fst - 1) in
+         (* malloc the actualy array *)
+         let struct_tp = ltype_of_typ typ in
+         let struct_t = L.element_type struct_tp in
+         let structp = L.build_malloc struct_t "arr_structp" builder in
+         let _ = 
+           L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+           L.build_store (L.const_int i32_t fst) (size_from_arrstruct structp builder) builder in
+         structp
+     | _, fst::snd -> 
+         let next_typ = match typ with A.Array(ityp) -> ityp in
+         (* get the array type *)
+         let arrt = L.build_malloc (L.array_type (ltype_of_typ typ) fst) "arrt" builder in
+         let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
+         let rec helper counter = match counter with 
+           i when counter < 0 -> ()
+         | i -> 
+             L.build_store (build_arr next_typ snd) (L.build_gep arrp [| L.const_int i64_t i |] "" builder) 
+                            builder; helper (i - 1) in
+         let _ = helper (fst - 1) in
+         (* malloc the actualy array *)
+         let struct_tp = ltype_of_typ typ in
+         let struct_t = L.element_type struct_tp in
+         let structp = L.build_malloc struct_t "arr_structp" builder in
+         structp in
+     build_arr (A.Array(typ1)) ints
 
   (* == is the only binop that can apply to any two types. *)
   | _, SBinop(sexpr1, A.DoubleEq, sexpr2) ->
