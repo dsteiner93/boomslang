@@ -17,4 +17,29 @@ To run the test suite, run "make test" inside the src directory.
 The Boomslang compiler requires OCaml and LLVM to be installed on the compiling machine. The following Docker image can also be used: https://hub.docker.com/r/columbiasedwards/plt
 
 # Writing programs
-foo bar baz
+Boomslang has the following types built in: int, long, float, char, string, and boolean. Users may define their own types (called classes), as well as make arrays of any type. In addition to the previously mentioned types, functions may return a special "void" type, indicating there is no return value, and objects may be assigned NULL. (No type other than objects may be NULL.)
+
+Here are some examples of how to use the types in Boomslang:
+```
+int a = 5
+long b = 100L
+float c = 2.2
+char d = 'd'
+string str = "foo"
+boolean is_boomslang_a_good_language = true
+MyObject my_object = NULL
+int[] arr = [1, 2, 3, 4, 5]
+```
+
+By convention, function names and variable names should be snake_case rather than camelCase. By necessity, class names must start with an uppercase letter and only contain letters (no numbers). **Also by necessity, all indentation must be done using tabs. Spaces will not work.**
+
+-Arrays
+-Binops
+-println
+
+-Ifs
+-Loops
+-Functions
+-Classes
+-Generic classes
+-Must use tabs
