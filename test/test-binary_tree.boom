@@ -10,17 +10,17 @@ class BinTree:
 	static:
 		Node root = NULL
 	def printLevelOrder() returns void:
-		int h = height(root)
+		int h = self.height(root)
 		int i = 1
 		loop i+=1 while i<=h:
-			printGivenLevel(root, i)
+			self.printGivenLevel(root, i)
 
 	def height() returns int:
 		if self.root==NULL:
 			return 0
 		else:
-			int lheight = height(self.root.left)
-			int rheight = height(self.root.right)
+			int lheight = self.height(self.root.left)
+			int rheight = self.height(self.root.right)
 		if lheight>rheight:
 			return lheight+1
 		else:
@@ -31,18 +31,18 @@ class BinTree:
 			return
 		if level==1:
 			println(root.data + " ")
-		else if level>1:
-			printGivenLevel(root.left, level-1)
-			printGivenLevel(root.right, level-1)
+		elif level>1:
+			self.printGivenLevel(root.left, level-1)
+			self.printGivenLevel(root.right, level-1)
 
 BinTree tree = BinTree()
 tree.root = Node(1289)
-tree.root.left = new Node(343
-tree.root.right = new Node(64)
-tree.root.right.right = new Node(454)
-tree.root.right.left = new Node(6754)
-tree.root.left.right = new Node(934)
-tree.root.left.left = new Node(845)
+tree.root.left = Node(343)
+tree.root.right = Node(64)
+tree.root.right.right = Node(454)
+tree.root.right.left = Node(6754)
+tree.root.left.right = Node(934)
+tree.root.left.left = Node(845)
 
 println("Level order BinTree traversal: ")
 tree.printLevelOrder()
