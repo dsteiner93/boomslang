@@ -1,0 +1,18 @@
+def is_even(int n) returns boolean:
+	if n == 0:
+		return true
+	else:
+		return is_odd(n - 1)
+
+def is_odd(int n) returns boolean:
+	if n == 0:
+		return false
+	else:
+		return is_even(n - 1)
+
+int[] arr = [3,16,27,35]
+int i = 0
+loop i+=1 while i < len(arr):
+	int elem = arr[i]
+	println(elem + " is even? " + is_even(elem))
+	println(elem + " is odd? " + is_odd(elem))

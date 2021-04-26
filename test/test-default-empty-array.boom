@@ -1,0 +1,3 @@
+def get_intarr_size(int[] arr):
+	println(len(arr))
+get_intarr_size(default int[0])
