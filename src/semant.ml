@@ -500,7 +500,7 @@ check_array_assign lhs_name lhs_element_type this_scopes_v_table checked_expr =
   let lhs_type = Array(lhs_element_type) in
   let rhs_type = (fst checked_expr) in
   match rhs_type with
-    Array(rhs_element_type) ->
+    Array(_) ->
       if are_types_compatible lhs_type rhs_type then
         let converted_checked_expr = (lhs_type, (snd checked_expr)) in
         ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_checked_expr)))

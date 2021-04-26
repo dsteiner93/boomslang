@@ -132,12 +132,12 @@ let translate sp_units =
       let func_builder = L.builder_at_end context (L.entry_block func) in
       let alloc = L.build_alloca (L.pointer_type t) "" func_builder in          (* make space on the stack *)
       let formal = List.hd (Array.to_list (L.params func)) in  (* get the llvalue of the only formal argument *)
-      let stored_formal = L.build_store formal alloc func_builder in
+      let _ = L.build_store formal alloc func_builder in
       let loaded_formal = L.build_load alloc "" func_builder in
       let sizep = size_from_arrstruct loaded_formal func_builder in
       let size = L.build_load sizep "size" func_builder in
-      let _ = L.build_ret size func_builder in ()
-    )
+      let _ = L.build_ret size func_builder in () 
+      )
     else  ()  in  
 
   (* Return the LLVM type for a Boomslang type *)
@@ -198,7 +198,7 @@ let translate sp_units =
   in
 
   (* define the default values for all the types *)
-  let rec default_val_of_typ typ builder = match typ with
+  let default_val_of_typ typ builder = match typ with
     A.Primitive(A.Int)    -> L.const_int i32_t 0
   | A.Primitive(A.Long)   -> L.const_int i64_t 0
   | A.Primitive(A.Float)  -> L.const_float float_t 0.0
@@ -393,7 +393,7 @@ let translate sp_units =
       let structp = L.build_malloc struct_t "arr_structp" builder in
 
       let _ = 
-        L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+        ignore (L.build_store arrp (arrp_from_arrstruct structp builder) builder);
         L.build_store (L.const_int i32_t (List.length sexpr_list)) (size_from_arrstruct structp builder) builder in
 
       structp
@@ -405,21 +405,26 @@ let translate sp_units =
         helper typ1 in
      let default_val = default_val_of_typ base_typ builder in (* get the default value *)
      (* evaluate exprs into int list *)
-     let ints = List.fold_left (fun s e -> match e with _, SIntLiteral(v) -> v::s) [] sexprs in
+     let ints = 
+       let helper s e = match e with
+         _, SIntLiteral(v) -> v::s
+       | _, _              -> raise (Failure ("Default array failure, size not int literl")) in
+       List.fold_left helper [] sexprs in
      let rec build_arr typ expr_list = match typ, expr_list with
        A.Array(ityp), fst::[]  ->
          let arrt = L.build_malloc (L.array_type (ltype_of_typ ityp) fst) "arrt" builder in
          let arrp = L.build_gep arrt [| L.const_int i64_t 0; L.const_int i64_t 0 |] "arrp" builder in
          let rec helper i = match i with 
            _ when i < 0 -> ()
-         | _ -> L.build_store default_val (L.build_gep arrp [| L.const_int i64_t i |] "" builder) builder; helper (i - 1) in
+         | _ -> ignore (L.build_store default_val (L.build_gep arrp [| L.const_int i64_t i |] "" builder) builder); 
+                 helper (i - 1) in
          let _ = helper (fst - 1) in
          (* malloc the actual array *)
          let struct_tp = ltype_of_typ typ in
          let struct_t = L.element_type struct_tp in
          let structp = L.build_malloc struct_t "arr_structp" builder in
          let _ = 
-           L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+           ignore (L.build_store arrp (arrp_from_arrstruct structp builder) builder);
            L.build_store (L.const_int i32_t fst) (size_from_arrstruct structp builder) builder in
          structp
      | A.Array(ityp), fst::snd -> 
@@ -429,17 +434,19 @@ let translate sp_units =
          let rec helper i = match i with 
            _ when i < 0 -> ()
          | _ -> 
-             L.build_store (build_arr ityp snd) (L.build_gep arrp [| L.const_int i64_t i |] "" builder) 
-                            builder; helper (i - 1) in
+             ignore (L.build_store (build_arr ityp snd) (L.build_gep arrp [| L.const_int i64_t i |] "" builder) 
+                            builder); helper (i - 1) in
          let _ = helper (fst - 1) in
          (* malloc the actual array *)
          let struct_tp = ltype_of_typ typ in
          let struct_t = L.element_type struct_tp in
          let structp = L.build_malloc struct_t "arr_structp" builder in
          let _ = 
-           L.build_store arrp (arrp_from_arrstruct structp builder) builder;
+           ignore (L.build_store arrp (arrp_from_arrstruct structp builder) builder);
            L.build_store (L.const_int i32_t fst) (size_from_arrstruct structp builder) builder in
-         structp in
+         structp 
+     | _ -> raise (Failure ("default array generation failed: unrecognize pattern in build_arr"))
+     in
      build_arr (A.Array(typ1)) ints
 
   (* == is the only binop that can apply to any two types. *)
@@ -480,6 +487,7 @@ let translate sp_units =
                 (signature.fs_name ^ "_res") builder
           | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder
           | A.Array(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder
+          | _          -> raise (Failure ("SBinop matching error"))
         )
   (* Integer and long binops *)
   | _, SBinop(((A.Primitive(A.Int), _) as sexpr1), binop, ((A.Primitive(A.Int), _) as sexpr2))
