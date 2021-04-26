@@ -1,0 +1,46 @@
+class Node[T]:
+	required:
+		T data
+
+	optional:
+		Node left = NULL
+		Node right = NULL
+
+	def print_Level_Order() returns void:
+		int h = self.height()
+		int i = 1
+		loop i+=1 while i<=h:
+			self.print_Given_Level(i)
+
+	def height() returns int:
+		if self==NULL:
+			return 0
+		else:
+			int lheight = self.left.height()
+			int rheight = self.right.height()
+			if lheight>rheight:
+				return lheight+1
+			else:
+				return rheight+1
+
+	def print_Given_Level(int level) returns void:
+		if self==NULL:
+			return
+		if level==1:
+			println(self.data)
+		elif level>1:
+			self.left.print_Given_Level(level-1)
+			self.right.print_Given_Level(level-1)
+
+class IntNode = Node(int)
+
+IntNode root = IntNode(283)
+root.left = IntNode(343)
+root.right = IntNode(64)
+root.right.right = IntNode(454)
+root.right.left = IntNode(6754)
+root.left.right = IntNode(934)
+root.left.left = IntNode(845)
+
+println("Level order BinTree traversal: ")
+root.print_Level_Order()

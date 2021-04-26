@@ -1,0 +1,34 @@
+class Node[T]:
+        required:
+                T data
+
+        optional:
+                Node left = NULL
+                Node right = NULL
+
+        def print_level_order():
+                int h = self.height()
+                int i = 1
+                loop i+=1 while i<=h:
+                        self.print_given_level(i)
+
+        def height() returns int:
+                if self==NULL:
+                        return 0
+                else:
+                        int lheight = self.left.height()
+                        int rheight = self.right.height()
+                        if lheight>rheight:
+                                return lheight+1
+                        else:
+                                return rheight+1
+
+        def print_given_level(int level):
+                if self==NULL:
+                        return
+                if level==1:
+                        println(self.data)
+                elif level>1:
+                        self.left.print_given_level(level-1)
+                        self.right.print_given_level(level-1)
+
