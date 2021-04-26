@@ -119,7 +119,7 @@ elif a == 2:
   println("a == 2")
 ```
 
-Note that for **all** indentation in the language **tabs must be used** with **exactly one tab per indentation level**. **Note that markdown support for tab characters is limited so copy/pasting from this tutorial may not work as tabs get auto-converted to spaces.**
+Note that for **all** indentation in the language **tabs must be used** with **exactly one tab per indentation level**. Markdown support for tab characters is limited so copy/pasting from this tutorial may not work as tabs get auto-converted to spaces.
 
 Loops in Boomslang use a novel syntax not seen in any other known programming language. Loops can be defined in two different ways using the "loop" keyword.
 ```
