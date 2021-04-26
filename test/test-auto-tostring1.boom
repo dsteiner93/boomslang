@@ -1,0 +1,18 @@
+class MyGeneric[T]:
+	static:
+		T static1 = 0
+		string static2 = "hey"
+
+	required:
+		float x
+
+	optional:
+		char c = 'h'
+		int[][] arr = default int[2][5]
+
+class MyClass = MyGeneric(int)
+MyClass instance = MyClass(2.0)
+println(instance)
+
+MyClass instance2 = NULL
+println(instance2)

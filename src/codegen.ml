@@ -17,7 +17,6 @@ module A = Ast
 module S = Semant
 open Sast 
 
-
 module StringMap = Map.Make(String)
 module SignatureMap = S.SignatureMap
 module StringHash = Hashtbl.Make(struct
@@ -479,8 +478,8 @@ let translate sp_units =
               L.build_call (SignatureHash.find built_in_table signature)
                 (Array.of_list (List.fold_left (fun s e -> s @ [build_expr builder v_symbol_tables e]) [] [sexpr1; sexpr2]))
                 (signature.fs_name ^ "_res") builder
-          | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder (* TODO this is just a placeholder *)
-          | _ -> raise (Failure("TODO implement equality checks for arrays and classes"))
+          | A.Class(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder
+          | A.Array(_) -> L.build_icmp L.Icmp.Eq (L.const_int i64_t 0) (L.build_ptrdiff sexpr1' sexpr2' "" builder) "" builder
         )
   (* Integer and long binops *)
   | _, SBinop(((A.Primitive(A.Int), _) as sexpr1), binop, ((A.Primitive(A.Int), _) as sexpr2))

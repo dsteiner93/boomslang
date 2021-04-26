@@ -1,1 +1,1 @@
-Fatal error: exception Failure("Found duplicate generic type Class(G) in class MyGeneric")
+Fatal error: exception Failure("Found duplicate generic type Class_G_ in class MyGeneric")

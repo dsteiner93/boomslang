@@ -45,9 +45,9 @@ long int_to_long(int i)
     return (long) i;
 }
 
-float int_to_float(int i)
+double int_to_float(int i)
 {
-    return (float) i;
+    return (double) i;
 }
 
 // The following function was inspired by the stack ovrflow post
@@ -83,7 +83,7 @@ void check_long_not_zero(long l, char *message)
     }
 }
 
-void check_float_not_zero(float f, char *message)
+void check_float_not_zero(double f, char *message)
 {
     if (f == 0.0)
     {

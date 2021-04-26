@@ -1,0 +1,15 @@
+def myfunc(int[] x):
+	println("this works now")
+
+myfunc([])
+
+def myfunc(int[][] x):
+	println("this also works")
+
+myfunc([[], [], [], []])
+myfunc([[1,2], [1,2], [1,2]    ])
+
+int[][] arr1 = default int[0][0]
+int[][] arr2 = [[]]
+println(arr1)
+println(arr2)

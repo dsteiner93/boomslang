@@ -41,6 +41,14 @@ let type_is_nullable = function
 | Array(_) -> false
 | NullType -> true
 
+let rec arrays_are_compatible arr1 arr2 = (match arr1 with
+  Array(Array(_) as inner1) -> (match arr2 with
+      Array(Array(_) as inner2) -> arrays_are_compatible inner1 inner2
+    | _ -> false)
+| Array(NullType) -> true
+| Array(_) -> (arr2 = Array(NullType))
+| _ -> false)
+
 let binop_method_name = function
   Plus  -> "_+"
 | Subtract -> "_-"
@@ -55,7 +63,7 @@ let binop_method_name = function
 | _ -> raise (Failure("Attempted to use an incompatible binary operator on an object type."))
 
 let are_types_compatible typ1 typ2 =
-  ((typ1 = typ2) || (type_is_nullable(typ1) && typ2 = NullType))
+  ((typ1 = typ2) || (type_is_nullable(typ1) && typ2 = NullType) || (arrays_are_compatible typ1 typ2))
 
 let signature_could_match signature1 signature2 _ =
   if (signature1.fs_name = signature2.fs_name) && ((List.length signature1.formal_types) = (List.length signature2.formal_types)) then
@@ -82,6 +90,7 @@ let find_matching_signature signature signatures =
 let convert_nulls_in_checked_exprs checked_exprs matching_signature =
   let convert checked_expr typ = match (fst checked_expr) with
     NullType -> (typ, (snd checked_expr))
+  | Array(_) -> (typ, (snd checked_expr))
   | _ -> checked_expr in
   List.map2 convert checked_exprs matching_signature.formal_types
 
@@ -132,8 +141,10 @@ let wrap_to_string checked_exprs = match checked_exprs with
 | [(Primitive(Float), _)] -> (Primitive(String), SCall(SFuncCall("float_to_string", checked_exprs)))
 | [(Primitive(Char), _)] -> (Primitive(String), SCall(SFuncCall("char_to_string", checked_exprs)))
 | [(Primitive(Bool), _)] -> (Primitive(String), SCall(SFuncCall("bool_to_string", checked_exprs)))
+| [(Primitive(String), _) as sexpr] -> sexpr
 | [(_, SNullExpr)] -> (Primitive(String), SCall(SFuncCall("null_to_string", checked_exprs)))
 | [(Class(_), _) as sexpr] -> (Primitive(String), SCall(SMethodCall(sexpr, "to_string", [])))
+| [(Array(_), _)] -> (Primitive(String), SStringLiteral("Array"))
 | _ -> raise (Failure("Expected exactly 1 expression of a non-void primitive, null, or named object type."))
 in
 let wrap_int_to_long checked_exprs = match checked_exprs with
@@ -239,7 +250,7 @@ let rec convert_generic_typ generic_to_actual = function
 | NullType -> NullType
 and
 convert_generic_assign generic_to_actual = function
-  RegularAssign(typ, id, expr) -> RegularAssign((convert_generic_typ generic_to_actual typ), id, expr)
+  RegularAssign(typ, id, expr) -> RegularAssign((convert_generic_typ generic_to_actual typ), id, (convert_generic_expr generic_to_actual expr))
 and
 convert_generic_bind generic_to_actual bind =
   let typ = (fst bind) in
@@ -408,6 +419,7 @@ let rec check_fcall fname actuals v_symbol_tables =
       | [(Primitive(Bool), _)] -> [wrap_to_string checked_exprs]
       | [(NullType, _)] -> [wrap_to_string checked_exprs]
       | [(Class(_), _)] -> [wrap_to_string checked_exprs]
+      | [(Array(_), _)] -> [wrap_to_string checked_exprs]
       | _ -> checked_exprs in
     let signature = { fs_name = fname; formal_types = List.map (fst) wrapped_checked_exprs } in
     if SignatureMap.mem signature function_signatures then ((SignatureMap.find signature function_signatures), SCall (SFuncCall(fname, wrapped_checked_exprs))) else raise (Failure("No matching signature found for function call " ^ fname))
@@ -487,21 +499,9 @@ check_array_assign lhs_name lhs_element_type this_scopes_v_table checked_expr =
   let _ = check_class_exists_nested lhs_element_type in
   let lhs_type = Array(lhs_element_type) in
   let rhs_type = (fst checked_expr) in
-  (* Size checks can only be applied to array literals and are used for the empty list case,
-     because this is the only case where the type is unknown, other than a list containing
-     only NULLs, which is only allowed for objects. *)
-  let rhs_size = (match (snd checked_expr) with
-    SArrayLiteral(sexprs) -> List.length sexprs
-  | _ -> -1) in (* TODO this doesn't work with nested arrays *)
   match rhs_type with
     Array(rhs_element_type) ->
-      if rhs_size = 0 then
-        (* If the RHS is 0, then the types don't matter, since it can match any type *)
-        let converted_checked_expr = (lhs_type, (snd checked_expr)) in
-        ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_checked_expr)))
-      else if (type_is_nullable lhs_element_type) && ((lhs_element_type = rhs_element_type) || (rhs_element_type = NullType)) then
-        (* If the LHS is a nullable type, the array literal could be like [NULL, NULL, NULL] in which
-           case its element type will be NullType, but it should still match an array like MyArray[] *)
+      if are_types_compatible lhs_type rhs_type then
         let converted_checked_expr = (lhs_type, (snd checked_expr)) in
         ((StringHash.add this_scopes_v_table lhs_name lhs_type); (SRegularAssign(lhs_type, lhs_name, converted_checked_expr)))
       else if (rhs_type = lhs_type) then
@@ -614,18 +614,19 @@ and
 check_exprs_have_same_type l = match l with
   [] -> ()
 | [(_, _)] -> ()
-| (NullType, _) :: (typ2, _) :: _ ->
-    if (not (type_is_nullable typ2)) then
-      raise (Failure ("Array literal had incompatible types " ^ (str_of_typ NullType) ^ " " ^ (str_of_typ typ2)))
-    else check_exprs_have_same_type (List.tl l)
-| (typ1, _) :: (NullType, _) :: _ ->
-    if (not (type_is_nullable typ1)) then
-      raise (Failure ("Array literal had incompatible types " ^ (str_of_typ typ1) ^ " " ^ (str_of_typ NullType)))
-    else check_exprs_have_same_type (List.tl l)
 | (typ1, _) :: (typ2, _) :: _ ->
-    if typ1 <> typ2 then
+    if (not (are_types_compatible typ1 typ2)) then
       raise (Failure ("Array literal had incompatible types " ^ (str_of_typ typ1) ^ " " ^ (str_of_typ typ2)))
     else check_exprs_have_same_type (List.tl l)
+and
+get_checked_exprs_len = function
+  (_, SArrayLiteral(sexprs)) -> List.length sexprs
+| _ -> -1
+and
+check_length expected_length checked_expr =
+  if (get_checked_exprs_len checked_expr) <> expected_length then
+    raise (Failure("Mismatched array lengths detected inside array literal"))
+  else ()
 and
 check_array_literal exprs v_symbol_tables =
   if (List.length exprs) = 0 then (Array(NullType), (SArrayLiteral []))
@@ -638,6 +639,8 @@ check_array_literal exprs v_symbol_tables =
     NullType -> (typ, (snd checked_expr))
   | _ -> checked_expr in
   let null_safe_checked_exprs = List.map (convert_null element_typ) checked_exprs in
+  let expected_length = if List.length null_safe_checked_exprs > 0 then (get_checked_exprs_len (List.hd null_safe_checked_exprs)) else 0 in
+  let _ = List.iter (check_length expected_length) null_safe_checked_exprs in
   let typ = Array(element_typ) in (typ, (SArrayLiteral null_safe_checked_exprs))
 and
 
@@ -936,8 +939,32 @@ add_autogenerated_constructors v_symbol_tables classdecl checked_fdecls =
   let original_func_signatures = (List.fold_left add_fdecl SignatureMap.empty classdecl.methods) in
   checked_fdecls @ (List.filter (signature_is_not_yet_defined original_func_signatures) autogenerated_constructors)
 and
+get_to_string_from_assign class_name = function
+  RegularAssign(typ, name, _) ->
+    let checked_expr = (typ, SObjectVariableAccess({ sova_sexpr = (Class(class_name), SId("self")); sova_class_name = ""; sova_var_name = name; sova_is_static = false })) in
+    let inner_lhs = (Primitive(String), SStringLiteral(name ^ ":")) in
+    let inner_rhs = (wrap_to_string [checked_expr]) in
+    let inner = (Primitive(String), SBinop(inner_lhs, Plus, inner_rhs)) in
+    let outer = (Primitive(String), SStringLiteral("\n")) in
+    (Primitive(String), SBinop(inner, Plus, outer))
+and
+get_to_string_from_bind class_name bind =
+  let typ = (fst bind) in
+  let name = (snd bind) in
+  let checked_expr = (typ, SObjectVariableAccess({ sova_sexpr = (Class(class_name), SId("self")); sova_class_name = ""; sova_var_name = name; sova_is_static = false })) in
+  let inner_lhs = (Primitive(String), SStringLiteral(name ^ ":")) in
+  let inner_rhs = (wrap_to_string [checked_expr]) in
+  let inner = (Primitive(String), SBinop(inner_lhs, Plus, inner_rhs)) in
+  let outer = (Primitive(String), SStringLiteral("\n")) in
+  (Primitive(String), SBinop(inner, Plus, outer))
+and
 get_default_to_string classdecl =
-  { srtype = Primitive(String); sfname = "to_string"; sformals = []; sbody = [SReturn(Primitive(String), SStringLiteral("User did not define to_string method for class " ^ classdecl.cname))] }
+  let binops = (List.map (get_to_string_from_assign classdecl.cname) classdecl.static_vars) @ (List.map (get_to_string_from_bind classdecl.cname) classdecl.required_vars) @ (List.map (get_to_string_from_assign classdecl.cname) classdecl.optional_vars) in
+  let combine_binops orig new_element = (Primitive(String), SBinop(orig, Plus, new_element)) in
+  let predicate = (Primitive(Bool), SBinop( (Class(classdecl.cname), SId("self")) , DoubleEq, (NullType, SNullExpr))) in
+  let check_null = (SIf(predicate, [SReturn((Primitive(String), SStringLiteral("NULL")))], [], [])) in
+  let binops_combined = List.fold_left combine_binops (Primitive(String), SStringLiteral(classdecl.cname ^ ":\n")) binops in
+  { srtype = Primitive(String); sfname = "to_string"; sformals = []; sbody = [check_null; SReturn(binops_combined)] }
 and
 add_to_string_if_not_present classdecl checked_fdecls =
   let original_func_signatures = (List.fold_left add_fdecl SignatureMap.empty classdecl.methods) in

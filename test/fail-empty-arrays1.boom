@@ -1,0 +1,8 @@
+def myfunc(int[] arr):
+	println("hey")
+
+def myfunc(float[] arr):
+	println("hey")
+
+# this is ambiguous
+myfunc([])

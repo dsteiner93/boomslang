@@ -1,0 +1,62 @@
+class LinkedList[T]:
+	required:
+		T element
+
+	optional:
+		LinkedList next = NULL
+
+	def _+(LinkedList other) returns LinkedList:
+		# append the other list to this one
+		if self.next == NULL:
+			self.next = other
+			return self
+		else:
+			self.next + other
+			return self
+
+	def _+(T new_element) returns LinkedList:
+		if self.next == NULL:
+			self.next = LinkedList(new_element, NULL)
+			return self
+		else:
+			self.next + LinkedList(new_element, NULL)
+			return self
+
+	def _++(LinkedList other):
+		if self.next == NULL:
+			self.next = other
+		else:
+			self.next ++ other
+
+	def _++(T new_element):
+		if self.next == NULL:
+			self.next = LinkedList(new_element, NULL)
+		else:
+			self.next ++ LinkedList(new_element, NULL)
+
+	def _==(LinkedList other) returns boolean:
+		# Custom defined equality function
+		if self == NULL:
+			return other == NULL
+		elif other == NULL:
+			return false
+		else:
+			return (self.element == other.element) and (self.next == other.next)
+
+	def size() returns int:
+		int size = 1
+		LinkedList next_temp = self.next
+		loop while (next_temp != NULL):
+			size += 1
+			next_temp = next_temp.next
+		return size
+
+	def to_string() returns string:
+		string temp = ""
+		if self == NULL:
+			return "NULL"
+		elif self.next == NULL:
+			return temp + self.element
+		else:
+			return temp + self.element + " -> " + self.next.to_string()
+

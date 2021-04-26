@@ -1,0 +1,8 @@
+int[][] a = [[1,2], [3,4]]
+int[][] b = [[1,2], [3,4]]
+# this should not be equal
+# despite the elements being the same it is a different pointer
+println(a == b)
+# these should be the same
+println(a == a)
+println(b == b)

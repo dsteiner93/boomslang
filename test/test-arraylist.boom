@@ -1,0 +1,33 @@
+class ArrayList[T]:
+	optional:
+		int size = 0
+		T[] arr = default T[10]
+
+	def add(T element):
+		if self.size >= len(self.arr):
+			# TODO dynamic sized arrays are needed for this
+			#T[] copy = default T[len(self.arr) * 2]
+			T[] copy = default T[100]
+			int i = 0
+			loop i+=1 while i < len(self.arr):
+				copy[i] = self.arr[i]
+			self.arr = copy
+			self.add(element)
+		else:
+			self.arr[self.size] = element
+			self.size += 1
+
+	def get(int i) returns T:
+		return self.arr[i]
+
+class StringArrayList = ArrayList(string)
+
+StringArrayList list = StringArrayList()
+int i = 0
+loop i+=1 while i < 20:
+	list.add("string" + i)
+
+println(list.size)
+int i = 0
+loop i+=1 while i < list.size:
+	println(list.get(i))
