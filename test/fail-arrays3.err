@@ -1,1 +1,1 @@
-Fatal error: exception Failure("Illegal assignment. LHS was type int[] but RHS type was string[]")
+Fatal error: exception Failure("Illegal assignment. LHS was type Array_int_ but RHS type was Array_string_")
