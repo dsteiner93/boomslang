@@ -1,0 +1,18 @@
+class MyClass:
+	static:
+		int x = 10
+	def recur(int n) returns int:
+		if n>5:
+			return n
+		else:
+			return self.recur(n+1)
+	def recurvoid(int n) returns void:
+		println("hi")
+		if (n==1):
+			return
+		else:
+			self.recurvoid(n-1)
+
+MyClass m = MyClass()
+m.recurvoid(5)
+
