@@ -25,7 +25,7 @@ class BinTree:
 			return lheight+1
 		else:
 			return rheight+1
-	
+
 	def printGivenLevel(Node root, int level) returns void:
 		if root==NULL:
 			return
