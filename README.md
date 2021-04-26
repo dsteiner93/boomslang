@@ -17,6 +17,7 @@ To run the test suite, run "make test" inside the src directory.
 The Boomslang compiler requires OCaml and LLVM to be installed on the compiling machine. The following Docker image can also be used: https://hub.docker.com/r/columbiasedwards/plt
 
 # Writing programs
+## Basics
 Boomslang has the following types built in: int, long, float, char, string, and boolean. Users may define their own types (called classes), as well as make arrays of any type. In addition to the previously mentioned types, functions may return a special "void" type, indicating there is no return value, and objects may be assigned NULL. (No type other than objects may be NULL.)
 
 Here are some examples of how to use the types in Boomslang:
@@ -31,15 +32,129 @@ MyObject my_object = NULL
 int[] arr = [1, 2, 3, 4, 5]
 ```
 
+Arrays can also be initialized with a default value, similar to the "new" keyword in Java. Once initialized, you can access their contents using a standard syntax. The length of an array is obtained using the built-in len keyword.
+```
+int[] arr = default[10]
+arr[5] = 5
+int array_len = len(arr)
+```
+
+Finally, once a variable is properly be initialized, it can be updated to another value, as long as that value has the same type as the original initialization.
+```
+int a = 5
+a = 10  # this is legal
+string str = "foo"
+str = 10  # this is illegal
+```
+
+To inspect output of the program, the println() built-in function can be used. println() is polymorphic and can take any type. If the type is not a string, it will be automatically converted to a string.
+```
+# All of these work
+println("Hello, world")
+println(10)
+println(10.0)
+println(true)
+```
+
+Comments use the following syntax:
+```
+# This is a single-line comment
+/# This a multi-line
+comment #/
+```
+
+Our language supports the following mathematical and boolean operators. Ints, longs, and floats can be automatically coerced to each other in binary operators.
+```
++ - * / % == > < >= <= or and not
+
+int a = 5 + 10  # 15
+float b = 2.0 + 2  # 4.0
+boolean test = 10 > 5  # true
+
+boolean foo = true
+boolean not_foo = not foo
+boolean another_bool = foo and not_foo or foo
+```
+
+Boomslang also supports the following convenience operators for performing updates:
+```
++= -= *= /=
+
+int a = 5
+a += 5  # a is now 10. this line is equivalent to a = a + 5
+```
+
+## Control flow
+Boomslang contains two types of control flow statements: if/elif/else and loops. Ifs follow the same syntax and semantics as Python, meaning all of the following are supported:
+```
+if a == 0:
+  println(a)
+    
+if a == 0:
+  println("a == 0")
+else:
+  println("a != 0")
+    
+if a == 0:
+  println("a == 0")
+elif a == 1:
+  println("a == 1")
+else:
+  println("a != 0")
+    
+if a == 0:
+  println("a == 0")
+elif a == 1:
+  println("a == 1")
+elif a == 2:
+  println("a == 2")
+else:
+  println("a != 0")
+    
+if a == 0:
+  println("a == 0")
+elif a == 1:
+  println("a == 1")
+elif a == 2:
+  println("a == 2")
+```
+
+Note that for **all** indentation in the language **tabs must be used** with **exactly one tab per indentation level**.
+
+Loops in Boomslang use a novel syntax not seen in any other known programming language. Loops can be defined in two different ways using the "loop" keyword.
+```
+int i = 0
+loop i+=1 while i < 100:
+  println(i)
+    
+int i = 0
+loop while i < 100:
+  println(i)
+  i += 1
+```
+
+## Functions
 By convention, function names and variable names should be snake_case rather than camelCase. By necessity, class names must start with an uppercase letter and only contain letters (no numbers). **Also by necessity, all indentation must be done using tabs. Spaces will not work.**
 
--Arrays
--Binops
--println
+Functions are defined in a syntax similar to a strongly typed version of Python. A unique aspect of the syntax is that the return type is indicated via the "returns" keyword. Here are some examples of functions in Boomslang:
+```
+def my_func(int a) returns int:
+  return a
 
--Ifs
--Loops
--Functions
--Classes
--Generic classes
--Must use tabs
+def print_hello_world():
+  println("hello world")
+    
+def gcd(int a, int b) returns int:
+  loop while a != b:
+    if a > b:
+      a = a - b
+    else:
+      b = b - a
+  return a
+```
+
+Functions do not need to be defined before use. Functions are allowed to be self-recursive or mutually-recurisve with other functions.
+
+## Classes
+Classes
+Generic classes
