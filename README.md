@@ -153,7 +153,7 @@ def gcd(int a, int b) returns int:
   return a
 ```
 
-Functions do not need to be defined before use. Functions are allowed to be self-recursive or mutually-recurisve with other functions.
+Functions do not need to be defined before use. Functions are allowed to be self-recursive or mutually-recursive with other functions.
 
 ## Classes
 ### Class basics
